@@ -487,59 +487,93 @@ export default function NexikStartPage() {
               exit={{ opacity: 0, y: -20 }}
               className="flex-1 flex flex-col items-center justify-center text-center px-4"
             >
-              {/* NetNext AI Orb с свечением */}
-              <div className="relative mb-8">
-                <div className="absolute inset-[-20px] rounded-full bg-teal-500/20 blur-2xl animate-pulse" />
-                <div className="absolute inset-[-10px] rounded-full bg-teal-400/10 blur-xl" />
-                <NetNextSiriOrb size={80} isHovered={true} />
+              {/* NetNext AI Orb с многослойным свечением */}
+              <div className="relative mb-10">
+                <div className="absolute inset-[-30px] rounded-full bg-gradient-to-r from-teal-500/20 via-cyan-400/15 to-teal-500/20 blur-3xl animate-pulse" />
+                <div className="absolute inset-[-15px] rounded-full bg-teal-400/10 blur-xl" />
+                <motion.div
+                  animate={{ scale: [1, 1.05, 1], rotate: [0, 5, -5, 0] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <NetNextSiriOrb size={90} isHovered={true} />
+                </motion.div>
               </div>
               
-              <h2 className="text-2xl sm:text-3xl font-bold mb-3 bg-gradient-to-r from-white via-teal-100 to-white bg-clip-text text-transparent">
-                Нет сайта? Не проблема!
-              </h2>
-              <p className="text-zinc-400 mb-2 max-w-md text-sm sm:text-base">
-                Закажи сайт с уже интегрированным <span className="text-cyan-400 font-medium">Nexik AI</span>
-              </p>
-              <p className="text-zinc-500 mb-8 max-w-md text-sm">
-                у моего создателя — <span className="text-teal-400 font-semibold">NetNext Studio</span>
-              </p>
+              {/* Заголовок с анимацией */}
+              <motion.h2 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="text-2xl sm:text-3xl font-bold mb-4"
+              >
+                <span className="bg-gradient-to-r from-white via-teal-200 to-white bg-clip-text text-transparent">
+                  Нет сайта?
+                </span>
+                <br />
+                <span className="text-teal-400">Это даже лучше!</span>
+              </motion.h2>
+              
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="text-zinc-400 mb-8 max-w-sm text-sm sm:text-base leading-relaxed"
+              >
+                Создадим тебе современный сайт с уже встроенным{" "}
+                <span className="text-cyan-400 font-medium">Nexik AI</span>
+                {" "}—{" "}
+                <span className="text-white">твой бизнес будет на связи 24/7</span>
+              </motion.p>
 
-              {/* Преимущества */}
-              <div className="flex flex-wrap justify-center gap-3 mb-8 max-w-md">
-                <div className="px-3 py-1.5 bg-teal-500/10 border border-teal-500/20 rounded-full text-xs text-teal-300">
-                  от 300₽
+              {/* Карточки преимуществ */}
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="grid grid-cols-3 gap-3 mb-8 w-full max-w-sm"
+              >
+                <div className="flex flex-col items-center p-3 bg-gradient-to-b from-teal-500/10 to-transparent border border-teal-500/20 rounded-2xl">
+                  <span className="text-xl sm:text-2xl font-bold text-teal-300">3</span>
+                  <span className="text-[10px] sm:text-xs text-zinc-500 mt-1">BYN</span>
                 </div>
-                <div className="px-3 py-1.5 bg-teal-500/10 border border-teal-500/20 rounded-full text-xs text-teal-300">
-                  за 24 часа
+                <div className="flex flex-col items-center p-3 bg-gradient-to-b from-cyan-500/10 to-transparent border border-cyan-500/20 rounded-2xl">
+                  <span className="text-xl sm:text-2xl font-bold text-cyan-300">24</span>
+                  <span className="text-[10px] sm:text-xs text-zinc-500 mt-1">часа</span>
                 </div>
-                <div className="px-3 py-1.5 bg-teal-500/10 border border-teal-500/20 rounded-full text-xs text-teal-300">
-                  с AI-ассистентом
+                <div className="flex flex-col items-center p-3 bg-gradient-to-b from-teal-500/10 to-transparent border border-teal-500/20 rounded-2xl">
+                  <span className="text-xl sm:text-2xl font-bold text-teal-300">AI</span>
+                  <span className="text-[10px] sm:text-xs text-zinc-500 mt-1">встроен</span>
                 </div>
-              </div>
+              </motion.div>
               
-              <div className="w-full max-w-md space-y-3">
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="w-full max-w-sm space-y-3"
+              >
                 {/* Главная кнопка - чат с NetNext AI */}
                 <button
                   onClick={openNetnextChat}
-                  className="w-full py-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-semibold rounded-2xl hover:from-teal-400 hover:to-cyan-400 transition-all flex items-center justify-center gap-3 shadow-lg shadow-teal-500/25 hover:shadow-teal-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                  className="group w-full py-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-semibold rounded-2xl hover:from-teal-400 hover:to-cyan-400 transition-all flex items-center justify-center gap-3 shadow-lg shadow-teal-500/25 hover:shadow-teal-500/50 hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  <MessageCircle className="w-5 h-5" />
-                  Узнать подробнее
+                  <MessageCircle className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                  Поговорить с NetNext AI
                 </button>
 
                 {/* Кнопка заказа напрямую */}
                 <button
                   onClick={goToContactForm}
-                  className="w-full py-4 bg-white/5 text-white font-medium rounded-2xl hover:bg-white/10 transition-all flex items-center justify-center gap-3 border border-white/10 hover:border-white/20"
+                  className="w-full py-3.5 bg-white/5 text-zinc-300 font-medium rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-2 border border-white/10 hover:border-white/20 text-sm"
                 >
-                  <ExternalLink className="w-5 h-5 text-zinc-400" />
-                  <span>Сразу заказать на netnext.site</span>
+                  <ExternalLink className="w-4 h-4 text-zinc-500" />
+                  <span>Оставить заявку на netnext.site</span>
                 </button>
 
                 {/* Разделитель */}
-                <div className="flex items-center gap-4 py-3">
+                <div className="flex items-center gap-4 py-2">
                   <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-                  <span className="text-xs text-zinc-600">или</span>
+                  <span className="text-[10px] text-zinc-600 uppercase tracking-widest">или</span>
                   <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
                 </div>
 
@@ -547,24 +581,24 @@ export default function NexikStartPage() {
                 <div className="relative group">
                   <button
                     disabled
-                    className="w-full py-3.5 bg-white/[0.02] text-zinc-600 text-sm rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-white/5"
+                    className="w-full py-3 bg-transparent text-zinc-600 text-sm rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-dashed border-white/10"
                   >
-                    <Lock className="w-4 h-4" />
-                    Хочу использовать в другой сфере
+                    <Lock className="w-3.5 h-3.5" />
+                    Использовать в другой сфере
                   </button>
-                  <div className="absolute -top-9 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 text-xs text-zinc-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                    В разработке
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2.5 py-1 bg-zinc-900/90 backdrop-blur border border-white/10 text-[10px] text-zinc-400 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                    Скоро
                   </div>
                 </div>
 
                 {/* Кнопка продолжить без сайта */}
                 <button 
                   onClick={() => setStep("register")} 
-                  className="w-full py-3 text-zinc-500 hover:text-zinc-300 transition-colors text-sm hover:underline underline-offset-4"
+                  className="w-full py-2 text-zinc-600 hover:text-zinc-400 transition-colors text-xs"
                 >
-                  У меня уже есть сайт, продолжить
+                  У меня есть сайт, пропустить
                 </button>
-              </div>
+              </motion.div>
             </motion.div>
           )}
 
