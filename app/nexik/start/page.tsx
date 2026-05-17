@@ -216,8 +216,8 @@ export default function NexikStartPage() {
         setNetnextMessages(prev => [...prev, response])
         setNetnextTyping(false)
         return
-      } catch (e) {
-        console.error("Lead submit error:", e)
+      } catch {
+        // Silent fail for lead submit
       }
     }
 
@@ -231,7 +231,7 @@ export default function NexikStartPage() {
           message: messageText,
           context: {
             companyName: "NetNext Studio",
-            companyDescription: `Веб-студия NetNext. Клиент интересуется созданием сайта. Его бизнес: ${businessDesc || "не указано"}. Предлагай сайт за 300 рублей и 24 часа работы с интеграцией Nexik AI.`
+            companyDescription: `Веб-студия NetNext. Клиент интересуется созданием сайта. Его бизнес: ${businessDesc || "не указано"}. Предлагай сайт от 3 BYN (белорусских рублей) и 24 часа работы с интеграцией Nexik AI.`
           }
         })
       })
@@ -264,8 +264,7 @@ export default function NexikStartPage() {
       }
 
       setNetnextMessages(prev => [...prev, response])
-    } catch (error) {
-      console.error("AI error:", error)
+    } catch {
       const response: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",

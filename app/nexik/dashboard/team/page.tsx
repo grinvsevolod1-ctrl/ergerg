@@ -87,8 +87,8 @@ export default function TeamPage() {
         setMembers(data.members)
         setCurrentUserId(data.currentUserId)
       }
-    } catch (error) {
-      console.error('Failed to load team:', error)
+    } catch {
+      // Silent fail for team load
     } finally {
       setLoading(false)
     }
@@ -114,8 +114,7 @@ export default function TeamPage() {
       } else {
         alert(data.error || 'Failed to invite')
       }
-    } catch (error) {
-      console.error('Invite error:', error)
+    } catch {
       alert('Failed to invite member')
     } finally {
       setInviting(false)
@@ -136,8 +135,8 @@ export default function TeamPage() {
         const data = await res.json()
         alert(data.error || 'Failed to update role')
       }
-    } catch (error) {
-      console.error('Change role error:', error)
+    } catch {
+      // Silent fail
     }
   }
 
@@ -155,8 +154,8 @@ export default function TeamPage() {
         const data = await res.json()
         alert(data.error || 'Failed to remove')
       }
-    } catch (error) {
-      console.error('Remove error:', error)
+    } catch {
+      // Silent fail
     }
   }
 

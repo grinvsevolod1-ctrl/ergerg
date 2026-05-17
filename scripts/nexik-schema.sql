@@ -413,6 +413,23 @@ CREATE TABLE IF NOT EXISTS nexik_rate_limits (
   UNIQUE(key, window_start)
 );
 
+-- Support requests table
+CREATE TABLE IF NOT EXISTS nexik_support_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255),
+  email VARCHAR(255) NOT NULL,
+  website VARCHAR(500) NOT NULL,
+  message TEXT,
+  widget_id UUID REFERENCES nexik_widgets(id) ON DELETE SET NULL,
+  type VARCHAR(50) DEFAULT 'general',
+  status VARCHAR(50) DEFAULT 'new',
+  resolved_at TIMESTAMPTZ,
+  resolved_by UUID REFERENCES nexik_org_members(id) ON DELETE SET NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- =====================================================
 -- INDEXES
 -- =====================================================
@@ -455,6 +472,9 @@ CREATE INDEX IF NOT EXISTS idx_nexik_webhooks_org ON nexik_webhooks(org_id);
 CREATE INDEX IF NOT EXISTS idx_nexik_analytics_org ON nexik_analytics(org_id, period_type, period_start DESC);
 
 CREATE INDEX IF NOT EXISTS idx_nexik_rate_limits_key ON nexik_rate_limits(key, window_start);
+
+CREATE INDEX IF NOT EXISTS idx_nexik_support_email ON nexik_support_requests(email);
+CREATE INDEX IF NOT EXISTS idx_nexik_support_status ON nexik_support_requests(status, created_at DESC);
 
 -- Vector search index (HNSW for fast similarity search)
 CREATE INDEX IF NOT EXISTS idx_nexik_chunks_embedding 
