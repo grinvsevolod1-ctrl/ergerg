@@ -108,11 +108,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create JWT token
+    // Create JWT token with payload matching auth service format
     const token = await new SignJWT({
-      sub: user.id,
+      memberId: user.id,
+      orgId: org.id,
       email: user.email,
-      org_id: org.id,
       role: user.role
     })
       .setProtectedHeader({ alg: 'HS256' })
@@ -120,21 +120,15 @@ export async function POST(request: NextRequest) {
       .setExpirationTime('7d')
       .sign(JWT_SECRET)
 
-    // Set cookies
+    // Set single session cookie (matching auth service)
     const cookieStore = await cookies()
     
-    cookieStore.set('nexik_token', token, {
+    cookieStore.set('nexik_session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7 // 7 days
-    })
-
-    cookieStore.set('nexik_org_id', org.id, {
-      httpOnly: false, // Allow JS access
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/'
     })
 
     return NextResponse.json({

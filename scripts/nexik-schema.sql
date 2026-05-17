@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS nexik_org_members (
   email_verified BOOLEAN DEFAULT false,
   last_login_at TIMESTAMP,
   
+  -- Password reset
+  reset_token TEXT,
+  reset_token_expires TIMESTAMP,
+  
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   

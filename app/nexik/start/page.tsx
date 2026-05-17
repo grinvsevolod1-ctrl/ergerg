@@ -148,7 +148,7 @@ export default function NexikStartPage() {
   }, [email, password, businessDesc, websiteUrl])
 
   const copyCode = useCallback(() => {
-    const code = `<script src="https://netnext.site/widget.js" data-id="${widgetId}"></script>`
+    const code = `<script src="https://nexik.org/nexik/widget.js" data-id="${widgetId}"></script>`
     navigator.clipboard.writeText(code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -332,7 +332,7 @@ export default function NexikStartPage() {
               <p className="text-zinc-400 mb-8">Вставь этот код на сайт перед {"</body>"}</p>
               <div className="w-full max-w-md">
                 <div className="relative bg-[#0a0a0f] border border-white/10 rounded-2xl p-4 mb-4">
-                  <code className="text-sm text-cyan-400 break-all">{`<script src="https://netnext.site/widget.js" data-id="${widgetId}"></script>`}</code>
+                  <code className="text-sm text-cyan-400 break-all">{`<script src="https://nexik.org/nexik/widget.js" data-id="${widgetId}"></script>`}</code>
                   <button onClick={copyCode} className="absolute top-3 right-3 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
                     {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-zinc-400" />}
                   </button>

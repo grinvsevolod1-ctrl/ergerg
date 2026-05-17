@@ -3,10 +3,10 @@
  * Premium animated widget with Siri-like orb effects
  * 
  * Usage:
- * <script src="https://netnext.site/widget.js" data-id="YOUR_WIDGET_ID"></script>
+ * <script src="https://nexik.org/nexik/widget.js" data-id="YOUR_WIDGET_ID"></script>
  * 
  * With custom color:
- * <script src="https://netnext.site/widget.js" data-id="YOUR_ID" data-color="#ff6b6b"></script>
+ * <script src="https://nexik.org/nexik/widget.js" data-id="YOUR_ID" data-color="#ff6b6b"></script>
  * 
  * All options:
  * data-id           - Your widget ID (required)

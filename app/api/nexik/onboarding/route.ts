@@ -57,9 +57,9 @@ export async function POST(req: NextRequest) {
       `, [memberId, orgId, email.toLowerCase(), passwordHash, businessName || 'Владелец', 'owner'])
 
       const token = await new SignJWT({
-        sub: memberId,
+        memberId: memberId,
+        orgId: orgId,
         email: email.toLowerCase(),
-        org_id: orgId,
         role: 'owner'
       })
         .setProtectedHeader({ alg: 'HS256' })
@@ -68,24 +68,19 @@ export async function POST(req: NextRequest) {
         .sign(JWT_SECRET)
 
       const cookieStore = await cookies()
-      cookieStore.set('nexik_token', token, {
+      cookieStore.set('nexik_session', token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7
-      })
-      cookieStore.set('nexik_org_id', orgId, {
-        httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7
+        maxAge: 60 * 60 * 24 * 7,
+        path: '/'
       })
 
       return NextResponse.json({
         success: true,
         widget: {
           id: widgetId,
-          embedCode: `<script src="https://netnext.site/widget.js" data-id="${widgetId}"></script>`
+          embedCode: `<script src="https://nexik.org/nexik/widget.js" data-id="${widgetId}"></script>`
         },
         credentials: {
           email: email.toLowerCase(),
