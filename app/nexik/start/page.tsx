@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Send, ArrowRight, Check, Loader2, Globe, Copy, X, Sparkles, MessageCircle, ExternalLink, Rocket, Lock } from "lucide-react"
+import { Send, ArrowRight, Check, Loader2, Globe, Copy, X, Sparkles, MessageCircle, ExternalLink, Lock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SiriOrb } from "@/components/nexik/siri-orb"
 import { SiriOrb as NetNextSiriOrb } from "@/components/ai-orb"
@@ -166,7 +166,7 @@ export default function NexikStartPage() {
     setStep("netnext-chat")
   }, [])
 
-  // Отправка сообщения в чат NetNext
+  // Отправка сообщения в чат NetNext - РЕАЛЬНЫЙ AI
   const sendNetnextMessage = useCallback(async (content?: string) => {
     const messageText = content || netnextInput.trim()
     if (!messageText || netnextTyping) return
@@ -176,185 +176,106 @@ export default function NexikStartPage() {
     if (!content) setNetnextInput("")
     setNetnextTyping(true)
 
-    // Симуляция ответа AI
-    await new Promise(r => setTimeout(r, 1000 + Math.random() * 500))
-
+    // Проверяем на контактные данные
     const lower = messageText.toLowerCase()
-    let response: Message
-
-    if (lower.includes("подробн") || lower.includes("детал") || lower.includes("расскаж")) {
-      response = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `С удовольствием расскажу подробнее!
-
-**Что мы делаем:**
-- Landing pages для бизнеса
-- Корпоративные сайты
-- Интернет-магазины
-- Веб-приложения
-
-**Почему именно мы:**
-1. Быстро - стандартный сайт за 1-3 дня
-2. Качественно - современный код и дизайн
-3. Доступно - цены от 300 рублей
-4. С поддержкой - не бросаем после сдачи
-
-**Про Nexik:**
-Это наш AI-продукт, который мы интегрируем бесплатно во все наши проекты. Он будет отвечать твоим клиентам 24/7!
-
-Готов обсудить твой проект?`,
-        buttons: [
-          { label: "Да, давай обсудим", action: "discuss" },
-          { label: "Хочу заказать", action: "order" }
-        ]
-      }
-    } else if (lower.includes("пример") || lower.includes("портфолио") || lower.includes("работ")) {
-      response = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `Вот несколько наших работ:
-
-**netnext.site** - наш собственный сайт с интегрированным Nexik
-**nexik.org** - платформа AI-ассистента
-
-Мы молодая студия, поэтому пока работаем над портфолио. Но это отличная возможность для тебя - получить качественный сайт по минимальной цене!
-
-Хочешь стать одним из первых клиентов?`,
-        buttons: [
-          { label: "Да, хочу заказать!", action: "order" },
-          { label: "Расскажи про цены", action: "prices" }
-        ]
-      }
-    } else if (lower.includes("цен") || lower.includes("стоим") || lower.includes("скольк")) {
-      response = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `**Наши цены:**
-
-🚀 **Стартовый пакет - 300₽**
-- Одностраничный сайт (лендинг)
-- Адаптивный дизайн
-- Nexik AI интеграция
-- Срок: 24 часа
-
-💼 **Бизнес пакет - от 1000₽**
-- Многостраничный сайт
-- Уникальный дизайн
-- SEO-оптимизация
-- Nexik AI + настройка базы знаний
-- Срок: 2-3 дня
-
-🏢 **Корпоративный - от 3000₽**
-- Полноценный корпоративный сайт
-- CMS для управления контентом
-- Интеграции с CRM
-- Полная настройка Nexik
-- Срок: 5-7 дней
-
-Какой вариант тебе интересен?`,
-        buttons: [
-          { label: "Стартовый за 300₽", action: "order" },
-          { label: "Бизнес пакет", action: "order" },
-          { label: "Нужна консультация", action: "discuss" }
-        ]
-      }
-    } else if (lower.includes("заказ") || lower.includes("хочу") || lower.includes("готов") || lower.includes("давай")) {
-      response = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `Отлично! Давай оформим заявку.
-
-Мне нужно узнать:
-1. **Твоё имя** - как к тебе обращаться?
-2. **Телефон или Telegram** - для связи
-3. **Что за бизнес** - чтобы понять задачу
-
-${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` : ""}
-
-Напиши свои контакты, и наш менеджер свяжется с тобой в течение часа!`,
-        buttons: []
-      }
-    } else if (lower.includes("обсуд") || lower.includes("консульт") || lower.includes("вопрос")) {
-      response = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `Конечно, давай обсудим!
-
-Расскажи подробнее:
-- Какой тип сайта тебе нужен?
-- Есть ли референсы (примеры, которые нравятся)?
-- Какой бюджет и сроки?
-
-Или просто задай любой вопрос - отвечу!`,
-        buttons: []
-      }
-    } else if (lower.match(/(\+7|8|7)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}/) || 
-               lower.includes("@") || 
-               lower.match(/\d{10,}/)) {
-      // Похоже на контакты - сохраняем лид
-      const contactInfo = messageText
-      
-      // Отправляем заявку
+    const hasPhone = lower.match(/(\+7|8|7)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}/) || lower.match(/\d{10,}/)
+    const hasEmail = lower.includes("@")
+    
+    if (hasPhone || hasEmail) {
+      // Сохраняем лид и отправляем в Telegram
       try {
         await fetch("/api/leads", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            companyName: businessDesc || "Nexik Start - заявка",
-            phone: contactInfo.match(/[\d\+\-\(\)\s]+/)?.[0] || contactInfo,
-            email: contactInfo.match(/[\w\.-]+@[\w\.-]+/)?.[0] || "не указан",
-            description: `Заявка из Nexik Start.\nБизнес: ${businessDesc}\nКонтакт: ${contactInfo}`,
+            companyName: businessDesc || "Nexik Start - заявка на сайт",
+            phone: messageText.match(/[\d\+\-\(\)\s]+/)?.[0] || "",
+            email: messageText.match(/[\w\.-]+@[\w\.-]+/)?.[0] || "",
+            description: `Заявка из Nexik Start на создание сайта.\nБизнес: ${businessDesc}\nКонтакт: ${messageText}`,
             niche: businessDesc,
-            source: "nexik_start",
+            source: "nexik_start_netnext",
             consentGiven: true
           })
         })
         setLeadSubmitted(true)
+        
+        // Ответ на успешную заявку
+        const response: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `Отлично! Записал твои контакты.
+
+Заявка принята! Наш менеджер свяжется с тобой в ближайшее время (обычно в течение часа в рабочее время).
+
+А пока ты можешь создать аккаунт в Nexik и попробовать AI-ассистента прямо сейчас - это бесплатно!`,
+          buttons: [
+            { label: "Создать аккаунт Nexik", action: "register" },
+            { label: "Открыть netnext.site", action: "netnext" }
+          ]
+        }
+        setNetnextMessages(prev => [...prev, response])
+        setNetnextTyping(false)
+        return
       } catch (e) {
         console.error("Lead submit error:", e)
       }
+    }
 
-      response = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `Супер! Записал твои контакты.
+    // Вызываем реальный AI API
+    try {
+      const res = await fetch("/api/chat/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: `nexik_start_${Date.now()}`,
+          message: messageText,
+          context: {
+            companyName: "NetNext Studio",
+            companyDescription: `Веб-студия NetNext. Клиент интересуется созданием сайта. Его бизнес: ${businessDesc || "не указано"}. Предлагай сайт за 300 рублей и 24 часа работы с интеграцией Nexik AI.`
+          }
+        })
+      })
 
-✅ **Заявка принята!**
-
-Наш менеджер свяжется с тобой в ближайшее время (обычно в течение часа в рабочее время).
-
-А пока ты можешь:
-- Создать аккаунт в Nexik и попробовать AI-ассистента
-- Посмотреть наш сайт netnext.site
-- Написать нам в Telegram: @netnext_support
-
-Спасибо за доверие! 🙏`,
-        buttons: [
-          { label: "Создать аккаунт Nexik", action: "register" },
-          { label: "Открыть netnext.site", action: "netnext" }
+      const data = await res.json()
+      
+      // Определяем кнопки на основе контекста
+      let buttons: { label: string; action: string }[] = []
+      const responseText = data.text || data.error || "Произошла ошибка, попробуй еще раз"
+      
+      if (responseText.toLowerCase().includes("цен") || responseText.toLowerCase().includes("стоим")) {
+        buttons = [
+          { label: "Хочу заказать!", action: "order" },
+          { label: "Расскажи подробнее", action: "details" }
         ]
-      }
-    } else {
-      response = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: `Понял тебя! 
-
-Если хочешь заказать сайт - просто напиши свои контакты (телефон или telegram), и мы свяжемся.
-
-Или могу рассказать подробнее о наших услугах и ценах.
-
-Что тебе интересно?`,
-        buttons: [
+      } else if (responseText.toLowerCase().includes("контакт") || responseText.toLowerCase().includes("запис")) {
+        buttons = []
+      } else {
+        buttons = [
           { label: "Расскажи о ценах", action: "prices" },
           { label: "Хочу заказать", action: "order" }
         ]
       }
-    }
 
-    setNetnextMessages(prev => [...prev, response])
-    setNetnextTyping(false)
+      const response: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: responseText,
+        buttons
+      }
+
+      setNetnextMessages(prev => [...prev, response])
+    } catch (error) {
+      console.error("AI error:", error)
+      const response: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Извини, произошла ошибка. Попробуй еще раз или напиши свои контакты - мы свяжемся!",
+        buttons: [{ label: "Хочу заказать", action: "order" }]
+      }
+      setNetnextMessages(prev => [...prev, response])
+    } finally {
+      setNetnextTyping(false)
+    }
   }, [netnextInput, netnextTyping, businessDesc])
 
   // Обработка кнопок в чате NetNext
@@ -564,52 +485,74 @@ ${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` :
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="flex-1 flex flex-col items-center justify-center text-center"
+              className="flex-1 flex flex-col items-center justify-center text-center px-4"
             >
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mb-6 shadow-lg shadow-violet-500/20">
-                <Rocket className="w-10 h-10 text-white" />
+              {/* NetNext AI Orb с свечением */}
+              <div className="relative mb-8">
+                <div className="absolute inset-[-20px] rounded-full bg-teal-500/20 blur-2xl animate-pulse" />
+                <div className="absolute inset-[-10px] rounded-full bg-teal-400/10 blur-xl" />
+                <NetNextSiriOrb size={80} isHovered={true} />
               </div>
-              <h2 className="text-2xl font-bold mb-3">Нет сайта? Не проблема!</h2>
-              <p className="text-zinc-400 mb-8 max-w-md">
-                Ты можешь заказать сайт с уже интегрированным Nexik AI у моего создателя - <span className="text-white font-medium">NetNext Studio</span>
+              
+              <h2 className="text-2xl sm:text-3xl font-bold mb-3 bg-gradient-to-r from-white via-teal-100 to-white bg-clip-text text-transparent">
+                Нет сайта? Не проблема!
+              </h2>
+              <p className="text-zinc-400 mb-2 max-w-md text-sm sm:text-base">
+                Закажи сайт с уже интегрированным <span className="text-cyan-400 font-medium">Nexik AI</span>
               </p>
+              <p className="text-zinc-500 mb-8 max-w-md text-sm">
+                у моего создателя — <span className="text-teal-400 font-semibold">NetNext Studio</span>
+              </p>
+
+              {/* Преимущества */}
+              <div className="flex flex-wrap justify-center gap-3 mb-8 max-w-md">
+                <div className="px-3 py-1.5 bg-teal-500/10 border border-teal-500/20 rounded-full text-xs text-teal-300">
+                  от 300₽
+                </div>
+                <div className="px-3 py-1.5 bg-teal-500/10 border border-teal-500/20 rounded-full text-xs text-teal-300">
+                  за 24 часа
+                </div>
+                <div className="px-3 py-1.5 bg-teal-500/10 border border-teal-500/20 rounded-full text-xs text-teal-300">
+                  с AI-ассистентом
+                </div>
+              </div>
               
               <div className="w-full max-w-md space-y-3">
-                {/* Кнопка чата с NetNext */}
+                {/* Главная кнопка - чат с NetNext AI */}
                 <button
                   onClick={openNetnextChat}
-                  className="w-full py-4 bg-gradient-to-r from-violet-500 to-purple-600 text-white font-medium rounded-2xl hover:from-violet-600 hover:to-purple-700 transition-all flex items-center justify-center gap-3 shadow-lg shadow-violet-500/20"
+                  className="w-full py-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-semibold rounded-2xl hover:from-teal-400 hover:to-cyan-400 transition-all flex items-center justify-center gap-3 shadow-lg shadow-teal-500/25 hover:shadow-teal-500/40 hover:scale-[1.02] active:scale-[0.98]"
                 >
                   <MessageCircle className="w-5 h-5" />
-                  Расскажи подробнее
+                  Узнать подробнее
                 </button>
 
                 {/* Кнопка заказа напрямую */}
                 <button
                   onClick={goToContactForm}
-                  className="w-full py-4 bg-white/10 text-white font-medium rounded-2xl hover:bg-white/15 transition-colors flex items-center justify-center gap-3 border border-white/10"
+                  className="w-full py-4 bg-white/5 text-white font-medium rounded-2xl hover:bg-white/10 transition-all flex items-center justify-center gap-3 border border-white/10 hover:border-white/20"
                 >
-                  <ExternalLink className="w-5 h-5" />
-                  Заказать у создателя
+                  <ExternalLink className="w-5 h-5 text-zinc-400" />
+                  <span>Сразу заказать на netnext.site</span>
                 </button>
 
                 {/* Разделитель */}
-                <div className="flex items-center gap-4 py-2">
-                  <div className="flex-1 h-px bg-white/10" />
-                  <span className="text-xs text-zinc-500">или</span>
-                  <div className="flex-1 h-px bg-white/10" />
+                <div className="flex items-center gap-4 py-3">
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                  <span className="text-xs text-zinc-600">или</span>
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
                 </div>
 
                 {/* Кнопка "другая сфера" - неактивная */}
                 <div className="relative group">
                   <button
                     disabled
-                    className="w-full py-4 bg-white/5 text-zinc-500 font-medium rounded-2xl cursor-not-allowed flex items-center justify-center gap-3 border border-white/5"
+                    className="w-full py-3.5 bg-white/[0.02] text-zinc-600 text-sm rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-white/5"
                   >
                     <Lock className="w-4 h-4" />
                     Хочу использовать в другой сфере
                   </button>
-                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-zinc-800 text-xs text-zinc-300 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  <div className="absolute -top-9 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 text-xs text-zinc-400 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                     В разработке
                   </div>
                 </div>
@@ -617,7 +560,7 @@ ${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` :
                 {/* Кнопка продолжить без сайта */}
                 <button 
                   onClick={() => setStep("register")} 
-                  className="w-full py-3 text-zinc-500 hover:text-zinc-300 transition-colors text-sm"
+                  className="w-full py-3 text-zinc-500 hover:text-zinc-300 transition-colors text-sm hover:underline underline-offset-4"
                 >
                   У меня уже есть сайт, продолжить
                 </button>
@@ -816,7 +759,7 @@ ${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` :
                   <Sparkles className="w-5 h-5 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white mb-1">Демо виджета Nexik</p>
+                  <p className="text-sm font-medium text-white mb-1">Де��о виджета Nexik</p>
                   <p className="text-xs text-zinc-400 leading-relaxed">Так будет выглядеть AI-чат на вашем сайте. Клиенты смогут общаться с ботом 24/7.</p>
                 </div>
               </div>
