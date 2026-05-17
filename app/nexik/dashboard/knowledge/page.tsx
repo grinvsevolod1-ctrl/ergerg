@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
+import { useNexikAuth } from "@/lib/nexik/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Plus, Trash2, Search, FileText, HelpCircle, BookOpen, X } from "lucide-react"
+import { Plus, Trash2, Search, FileText, HelpCircle, BookOpen, X, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface Document {
   id: string
@@ -19,10 +21,11 @@ interface Document {
 }
 
 export default function KnowledgePage() {
+  const { session } = useNexikAuth()
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchResults, setSearchResults] = useState<Array<{ title: string; content: string; score: number }>>([])
   const [isSearching, setIsSearching] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<"faq" | "document">("faq")
@@ -31,9 +34,14 @@ export default function KnowledgePage() {
   const [newFaq, setNewFaq] = useState({ question: "", answer: "", category: "" })
   const [isAdding, setIsAdding] = useState(false)
 
-  const loadDocuments = async () => {
+  // Use org slug as clientId for the knowledge API
+  const clientId = session?.org?.slug || ''
+
+  const loadDocuments = useCallback(async () => {
+    if (!clientId) return
+    
     try {
-      const res = await fetch("/api/ai/knowledge?clientId=netnext")
+      const res = await fetch(`/api/ai/knowledge?clientId=${clientId}`)
       const data = await res.json()
       setDocuments(data.documents || [])
     } catch (error) {
@@ -41,17 +49,19 @@ export default function KnowledgePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [clientId])
 
   useEffect(() => {
-    loadDocuments()
-  }, [])
+    if (clientId) {
+      loadDocuments()
+    }
+  }, [clientId, loadDocuments])
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return
+    if (!searchQuery.trim() || !clientId) return
     setIsSearching(true)
     try {
-      const res = await fetch(`/api/ai/knowledge?clientId=netnext&query=${encodeURIComponent(searchQuery)}`)
+      const res = await fetch(`/api/ai/knowledge?clientId=${clientId}&query=${encodeURIComponent(searchQuery)}`)
       const data = await res.json()
       setSearchResults(data.results || [])
     } catch (error) {
@@ -62,14 +72,14 @@ export default function KnowledgePage() {
   }
 
   const handleAddDocument = async () => {
-    if (!newDoc.title || !newDoc.content) return
+    if (!newDoc.title || !newDoc.content || !clientId) return
     setIsAdding(true)
     try {
       const res = await fetch("/api/ai/knowledge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientId: "netnext",
+          clientId,
           type: "document",
           title: newDoc.title,
           content: newDoc.content,
@@ -88,14 +98,14 @@ export default function KnowledgePage() {
   }
 
   const handleAddFaq = async () => {
-    if (!newFaq.question || !newFaq.answer) return
+    if (!newFaq.question || !newFaq.answer || !clientId) return
     setIsAdding(true)
     try {
       const res = await fetch("/api/ai/knowledge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clientId: "netnext",
+          clientId,
           type: "faq",
           faqs: [{ question: newFaq.question, answer: newFaq.answer, category: newFaq.category || undefined }],
         }),
@@ -113,13 +123,24 @@ export default function KnowledgePage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Удалить этот документ?")) return
+    if (!confirm("Удалить этот документ?") || !clientId) return
     try {
-      await fetch(`/api/ai/knowledge?clientId=netnext&documentId=${id}`, { method: "DELETE" })
+      await fetch(`/api/ai/knowledge?clientId=${clientId}&documentId=${id}`, { method: "DELETE" })
       loadDocuments()
     } catch (error) {
       console.error("Failed to delete:", error)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <Skeleton className="h-8 w-48 bg-white/10 mb-4" />
+        <Skeleton className="h-4 w-64 bg-white/10 mb-8" />
+        <Skeleton className="h-24 rounded-2xl bg-white/10 mb-6" />
+        <Skeleton className="h-64 rounded-2xl bg-white/10" />
+      </div>
+    )
   }
 
   return (

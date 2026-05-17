@@ -72,34 +72,37 @@ export function middleware(request: NextRequest) {
     : pathname.startsWith('/nexik/dashboard')
     
   if (dashboardPath || pathname.startsWith('/nexik/dashboard')) {
-    const token = request.cookies.get('nexik_token')?.value
-    const orgId = request.cookies.get('nexik_org_id')?.value
+    // Auth service uses 'nexik_session' cookie (JWT with memberId, orgId, email, role)
+    const sessionToken = request.cookies.get('nexik_session')?.value
 
-    // No token - redirect to start
-    if (!token || !orgId) {
+    // No session - redirect to start
+    if (!sessionToken) {
       const url = request.nextUrl.clone()
       url.pathname = '/nexik/start'
       url.searchParams.set('redirect', pathname)
       return NextResponse.redirect(url)
     }
 
-    // Basic JWT validation (check expiry)
+    // Basic JWT validation (check expiry and payload)
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
+      const payload = JSON.parse(atob(sessionToken.split('.')[1]))
       const exp = payload.exp * 1000
+      
+      // Validate required fields exist
+      if (!payload.memberId || !payload.orgId) {
+        throw new Error('Invalid session payload')
+      }
 
       if (Date.now() > exp) {
         // Token expired - clear and redirect
         const response = NextResponse.redirect(new URL('/nexik/start', request.url))
-        response.cookies.delete('nexik_token')
-        response.cookies.delete('nexik_org_id')
+        response.cookies.delete('nexik_session')
         return response
       }
     } catch {
       // Invalid token format - redirect
       const response = NextResponse.redirect(new URL('/nexik/start', request.url))
-      response.cookies.delete('nexik_token')
-      response.cookies.delete('nexik_org_id')
+      response.cookies.delete('nexik_session')
       return response
     }
   }

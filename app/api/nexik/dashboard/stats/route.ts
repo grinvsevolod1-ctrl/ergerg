@@ -1,36 +1,28 @@
 /**
  * Nexik Dashboard Stats API
+ * Uses session authentication instead of query params
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { getSession } from '@/lib/nexik/services/auth'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const orgId = req.nextUrl.searchParams.get('org_id')
+    // Get session - requires authentication
+    const session = await getSession()
     
-    if (!orgId) {
-      // Return demo data if no org_id
-      return NextResponse.json({
-        success: true,
-        stats: {
-          totalConversations: 127,
-          todayConversations: 12,
-          totalMessages: 1543,
-          leadsCollected: 34,
-          appointmentsBooked: 8,
-          avgResponseTime: "2s",
-          aiWorkingHours: 168,
-        },
-        recentChats: [
-          { id: "1", visitor: "Посетитель из Минска", lastMessage: "Сколько стоит услуга?", time: "2 мин назад", status: "ai" },
-          { id: "2", visitor: "Анна К.", lastMessage: "Хочу записаться на завтра", time: "15 мин назад", status: "resolved" },
-        ]
-      })
+    if (!session) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Не авторизован' 
+      }, { status: 401 })
     }
 
-    // Get real stats
-    const [conversations, messages, todayConversations] = await Promise.all([
+    const orgId = session.org.id
+
+    // Get real stats in parallel
+    const [conversations, messages, todayConversations, leadsCount] = await Promise.all([
       // Total conversations
       query<{ count: string }>(
         `SELECT COUNT(*) as count FROM nexik_conversations WHERE org_id = $1`,
@@ -45,6 +37,13 @@ export async function GET(req: NextRequest) {
       query<{ count: string }>(
         `SELECT COUNT(*) as count FROM nexik_conversations 
          WHERE org_id = $1 AND created_at >= CURRENT_DATE`,
+        [orgId]
+      ),
+      // Leads collected (conversations with visitor_email or visitor_phone)
+      query<{ count: string }>(
+        `SELECT COUNT(*) as count FROM nexik_conversations 
+         WHERE org_id = $1 
+         AND (visitor_email IS NOT NULL OR visitor_phone IS NOT NULL)`,
         [orgId]
       ),
     ])
@@ -71,7 +70,7 @@ export async function GET(req: NextRequest) {
         ) as last_message
        FROM nexik_conversations c
        WHERE c.org_id = $1
-       ORDER BY c.created_at DESC
+       ORDER BY c.updated_at DESC
        LIMIT 10`,
       [orgId]
     )
@@ -101,23 +100,40 @@ export async function GET(req: NextRequest) {
       return `${Math.floor(diffMins / 1440)} дн назад`
     }
 
+    // Map status to UI status
+    const mapStatus = (status: string): 'ai' | 'waiting' | 'resolved' => {
+      switch (status) {
+        case 'active':
+        case 'ai_handling':
+          return 'ai'
+        case 'waiting_operator':
+        case 'operator_handling':
+          return 'waiting'
+        case 'resolved':
+        case 'closed':
+          return 'resolved'
+        default:
+          return 'ai'
+      }
+    }
+
     return NextResponse.json({
       success: true,
       stats: {
         totalConversations: parseInt(conversations[0]?.count || '0'),
         todayConversations: parseInt(todayConversations[0]?.count || '0'),
         totalMessages: parseInt(messages[0]?.count || '0'),
-        leadsCollected: 0, // Placeholder - requires leads table implementation
-        appointmentsBooked: 0, // Placeholder - requires appointments table implementation
+        leadsCollected: parseInt(leadsCount[0]?.count || '0'),
+        appointmentsBooked: 0, // Placeholder - requires appointments feature
         avgResponseTime,
-        aiWorkingHours: 168, // AI works 24/7
+        aiWorkingHours: 168, // AI works 24/7 = 168 hours per week
       },
       recentChats: recentChats.map(chat => ({
         id: chat.id,
-        visitor: chat.visitor_name || chat.visitor_email || 'Посетитель',
+        visitor: chat.visitor_name || chat.visitor_email?.split('@')[0] || 'Посетитель',
         lastMessage: chat.last_message || 'Нет сообщений',
         time: formatTimeAgo(chat.created_at),
-        status: chat.status === 'active' ? 'ai' : chat.status === 'resolved' ? 'resolved' : 'waiting'
+        status: mapStatus(chat.status)
       }))
     })
 

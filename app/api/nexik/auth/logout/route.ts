@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { logout } from '@/lib/nexik/services/auth'
 
 export async function POST() {
-  const cookieStore = await cookies()
-  
-  // Clear auth cookies
-  cookieStore.delete('nexik_token')
-  cookieStore.delete('nexik_org_id')
-
-  return NextResponse.json({ success: true })
+  try {
+    await logout()
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[Nexik Logout API] Error:', error)
+    return NextResponse.json({ error: 'Failed to logout' }, { status: 500 })
+  }
 }
 
 export async function GET() {

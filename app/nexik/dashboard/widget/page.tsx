@@ -1,33 +1,102 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useNexikAuth } from "@/lib/nexik/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Copy, Check, Eye, Code, Terminal, MessageSquare, Maximize2, Minimize2, Monitor } from "lucide-react"
+import { Copy, Check, Eye, Code, Terminal, MessageSquare, Maximize2, Minimize2, Monitor, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Skeleton } from "@/components/ui/skeleton"
+
+interface WidgetConfig {
+  id: string
+  name: string
+  theme: {
+    primaryColor: string
+    position: string
+  }
+  greetingMessage: string
+}
 
 export default function WidgetSettingsPage() {
+  const { session } = useNexikAuth()
+  const [widget, setWidget] = useState<WidgetConfig | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  
   const [config, setConfig] = useState({
-    clientId: "netnext",
     color: "#4fd1c5",
     position: "bottom-right",
     greeting: "Привет! Чем могу помочь?",
     botName: "Nexik AI",
-    // New display options
     displayMode: "modal" as "modal" | "mini",
     modalSize: "lg" as "sm" | "md" | "lg" | "xl",
   })
   const [copied, setCopied] = useState(false)
   const [activeTab, setActiveTab] = useState<"html" | "react" | "api">("html")
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://netnext.site"
+  useEffect(() => {
+    const loadWidget = async () => {
+      try {
+        const res = await fetch('/api/nexik/dashboard/widget')
+        const data = await res.json()
+        
+        if (data.success && data.widget) {
+          setWidget(data.widget)
+          setConfig(prev => ({
+            ...prev,
+            color: data.widget.theme?.primaryColor || prev.color,
+            position: data.widget.theme?.position || prev.position,
+            greeting: data.widget.greetingMessage || prev.greeting,
+            botName: data.widget.name || prev.botName,
+          }))
+        }
+      } catch (err) {
+        console.error('[Widget] Load error:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadWidget()
+  }, [])
+
+  const saveSettings = async () => {
+    if (!widget?.id) return
+    
+    setSaving(true)
+    try {
+      await fetch('/api/nexik/dashboard/widget', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          widgetId: widget.id,
+          name: config.botName,
+          greetingMessage: config.greeting,
+          theme: {
+            ...widget.theme,
+            primaryColor: config.color,
+            position: config.position,
+          }
+        })
+      })
+    } catch (err) {
+      console.error('[Widget] Save error:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Use org slug or widget id for client identification
+  const clientId = session?.org?.slug || widget?.id || 'demo'
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://nexik.org"
 
   const embedCode = `<!-- Nexik AI Chat Widget -->
 <script 
   src="${baseUrl}/nexik/widget.js"
-  data-client-id="${config.clientId}"
+  data-client-id="${clientId}"
   data-color="${config.color}"
   data-position="${config.position}"
   data-greeting="${config.greeting}"
@@ -45,7 +114,7 @@ export default function Layout({ children }) {
       {children}
       <Script
         src="${baseUrl}/nexik/widget.js"
-        data-client-id="${config.clientId}"
+        data-client-id="${clientId}"
         data-color="${config.color}"
         data-position="${config.position}"
         data-greeting="${config.greeting}"
@@ -72,49 +141,67 @@ export default function Layout({ children }) {
     xl: "80%",
   }
 
+  if (loading) {
+    return (
+      <div className="p-8">
+        <Skeleton className="h-8 w-64 bg-white/10 mb-4" />
+        <Skeleton className="h-4 w-96 bg-white/10 mb-8" />
+        <div className="grid lg:grid-cols-2 gap-8">
+          <Skeleton className="h-96 rounded-2xl bg-white/10" />
+          <Skeleton className="h-96 rounded-2xl bg-white/10" />
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-0.5 bg-primary" />
-            <span className="text-primary font-mono text-sm">{"// Виджет"}</span>
-          </div>
-          <h1 className="text-3xl font-bold">Настройки виджета</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold">Настройки виджета</h1>
+          <p className="text-[#888] mt-1">
             Настройте внешний вид и получите код для вставки
           </p>
         </div>
-        <Link href="/nexik/demo" target="_blank">
-          <Button variant="outline" className="bg-transparent gap-2">
-            <Eye className="w-4 h-4" />
-            Предпросмотр
+        <div className="flex gap-2">
+          <Link href="/nexik/demo" target="_blank">
+            <Button variant="outline" className="border-[#1a1a2e] hover:bg-white/5 gap-2">
+              <Eye className="w-4 h-4" />
+              Предпросмотр
+            </Button>
+          </Link>
+          <Button 
+            onClick={saveSettings} 
+            disabled={saving}
+            className="bg-[#00ffff] text-black hover:bg-[#00ffff]/90"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Сохранить'}
           </Button>
-        </Link>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
         {/* Configuration */}
-        <div className="rounded-2xl border border-border bg-card/80 backdrop-blur-sm overflow-hidden">
-          <div className="p-6 border-b border-border">
+        <div className="rounded-2xl border border-[#1a1a2e] bg-[#0a0a0f]/80 backdrop-blur-sm overflow-hidden">
+          <div className="p-4 sm:p-6 border-b border-[#1a1a2e]">
             <h2 className="text-lg font-semibold">Настройки</h2>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-[#888] mt-1">
               Кастомизируйте виджет под ваш бренд
             </p>
           </div>
           
-          <div className="p-6 space-y-5">
+          <div className="p-4 sm:p-6 space-y-5">
+            {/* Client ID - read only */}
             <div className="space-y-2">
-              <Label className="text-sm text-muted-foreground">Client ID</Label>
+              <Label className="text-sm text-[#888]">ID вашего виджета</Label>
               <Input
-                value={config.clientId}
-                onChange={(e) => setConfig({ ...config, clientId: e.target.value })}
-                placeholder="your-client-id"
-                className="bg-secondary/30 border-border"
+                value={clientId}
+                readOnly
+                className="bg-[#1a1a2e]/50 border-[#2a2a3e] text-[#888] cursor-not-allowed"
               />
-              <p className="text-xs text-muted-foreground">
-                Уникальный идентификатор для вашего проекта
+              <p className="text-xs text-[#555]">
+                Уникальный идентификатор вашей организации
               </p>
             </div>
 
