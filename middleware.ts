@@ -6,10 +6,34 @@ import type { NextRequest } from 'next/server'
  * - netnext.site -> main site
  * - nexik.org -> /nexik/* routes (rewrite, not redirect)
  * - Also handles Nexik dashboard auth and CORS
+ * 
+ * IMPORTANT for standalone mode + reverse proxy (Caddy/Nginx):
+ * - Use x-forwarded-host header instead of request.nextUrl.host
+ * - Caddy must be configured to pass the original host
  */
+// Enable debug mode via environment variable
+const DEBUG_MIDDLEWARE = process.env.DEBUG_MIDDLEWARE === 'true'
+
 export function middleware(request: NextRequest) {
-  const { pathname, host } = request.nextUrl
-  const hostname = host.split(':')[0] // Remove port if present
+  const { pathname } = request.nextUrl
+  
+  // Get the real hostname from headers (for reverse proxy support)
+  // Priority: x-forwarded-host > host header > nextUrl.host (fallback)
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const hostHeader = request.headers.get('host')
+  const nextUrlHost = request.nextUrl.host
+  const hostname = (forwardedHost || hostHeader || nextUrlHost).split(':')[0]
+  
+  // Debug logging (enable with DEBUG_MIDDLEWARE=true)
+  if (DEBUG_MIDDLEWARE) {
+    console.log('[Middleware Debug]', {
+      pathname,
+      forwardedHost,
+      hostHeader,
+      nextUrlHost,
+      resolvedHostname: hostname,
+    })
+  }
   
   // ========== MULTI-DOMAIN ROUTING ==========
   // nexik.org domain -> rewrite to /nexik/* routes
