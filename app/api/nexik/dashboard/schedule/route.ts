@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentSession } from '@/lib/nexik/services/auth'
+import { getSession } from '@/lib/nexik/services/auth'
 import { query } from '@/lib/db'
 
 export async function GET() {
   try {
-    const session = await getCurrentSession()
+    const session = await getSession()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -22,7 +22,7 @@ export async function GET() {
       WHERE org_id = $1 AND widget_id IS NULL
       ORDER BY created_at DESC
       LIMIT 1
-    `, [session.orgId])
+    `, [session.org.id])
 
     if (!schedule) {
       return NextResponse.json({
@@ -55,7 +55,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getCurrentSession()
+    const session = await getSession()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       SELECT id FROM nexik_schedules
       WHERE org_id = $1 AND widget_id IS NULL
       LIMIT 1
-    `, [session.orgId])
+    `, [session.org.id])
 
     if (existing) {
       // Update existing
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
         INSERT INTO nexik_schedules (org_id, mode, work_hours, work_days, timezone, custom_schedule)
         VALUES ($1, $2, $3, $4, $5, $6)
       `, [
-        session.orgId,
+        session.org.id,
         mode,
         JSON.stringify(workHours),
         workDays,

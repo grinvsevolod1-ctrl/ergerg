@@ -17,7 +17,9 @@ import {
   X,
   LogOut,
   User,
-  ChevronDown
+  ChevronDown,
+  BarChart3,
+  Users
 } from "lucide-react"
 import { NetNextLogo } from "@/components/netnext-logo"
 import { cn } from "@/lib/utils"
@@ -37,7 +39,9 @@ const navItems = [
   { href: "/nexik/dashboard", icon: LayoutDashboard, label: "Обзор", exact: true },
   { href: "/nexik/dashboard/chats", icon: MessageSquare, label: "Диалоги" },
   { href: "/nexik/dashboard/knowledge", icon: BookOpen, label: "База знаний" },
+  { href: "/nexik/dashboard/analytics", icon: BarChart3, label: "Аналитика" },
   { href: "/nexik/dashboard/schedule", icon: Clock, label: "Расписание" },
+  { href: "/nexik/dashboard/team", icon: Users, label: "Команда" },
   { href: "/nexik/dashboard/integration", icon: Plug, label: "Интеграция" },
   { href: "/nexik/dashboard/widget", icon: Code, label: "Виджет" },
   { href: "/nexik/dashboard/api-keys", icon: Key, label: "API ключи" },

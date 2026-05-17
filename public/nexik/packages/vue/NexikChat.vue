@@ -200,7 +200,7 @@ async function sendMessage() {
   try {
     const baseUrl = window.location.hostname === 'localhost'
       ? '/api/nexik/chat'
-      : 'https://nexik.io/api/nexik/chat'
+      : 'https://nexik.org/api/nexik/chat'
 
     const response = await fetch(baseUrl, {
       method: 'POST',

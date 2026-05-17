@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentSession } from '@/lib/nexik/services/auth'
+import { getSession } from '@/lib/nexik/services/auth'
 import { query } from '@/lib/db'
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getCurrentSession()
+    const session = await getSession()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
     
-    const orgId = session.orgId
+    const orgId = session.org.id
 
     // Get overview stats
     const [overview] = await query<{
