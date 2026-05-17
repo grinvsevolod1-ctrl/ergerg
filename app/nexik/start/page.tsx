@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Send, ArrowRight, Check, Loader2, Globe, Copy, X, Sparkles, MessageCircle, ExternalLink, Rocket, Lock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SiriOrb } from "@/components/nexik/siri-orb"
+import { SiriOrb as NetNextSiriOrb } from "@/components/ai-orb"
 
 type Step = "chat" | "website" | "offer" | "netnext-chat" | "register" | "done"
 
@@ -634,11 +635,12 @@ ${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` :
             >
               {/* Header чата */}
               <div className="flex items-center gap-3 pb-4 mb-4 border-b border-white/10">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+                <div className="relative">
+                  <div className="absolute inset-[-4px] rounded-full bg-teal-500/20 blur-md" />
+                  <NetNextSiriOrb size={44} isHovered={netnextTyping} />
                 </div>
                 <div>
-                  <div className="font-medium">Siri - NetNext AI</div>
+                  <div className="font-medium text-teal-300">NetNext AI</div>
                   <div className="text-xs text-zinc-500">Онлайн</div>
                 </div>
                 <button 
@@ -661,14 +663,14 @@ ${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` :
                   >
                     <div className="flex items-end gap-2">
                       {msg.role === "assistant" && (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                          <Sparkles className="w-4 h-4 text-white" />
+                        <div className="flex-shrink-0">
+                          <NetNextSiriOrb size={32} />
                         </div>
                       )}
                       <div className={cn(
                         "max-w-[85%] px-4 py-3 rounded-2xl text-sm whitespace-pre-line",
                         msg.role === "user"
-                          ? "bg-violet-500 text-white rounded-br-sm"
+                          ? "bg-teal-500 text-black rounded-br-sm"
                           : "bg-white/5 border border-white/10 rounded-bl-sm"
                       )}>
                         {msg.content}
@@ -681,7 +683,7 @@ ${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` :
                           <button
                             key={idx}
                             onClick={() => handleNetnextButton(btn.action)}
-                            className="px-3 py-1.5 text-xs bg-violet-500/20 text-violet-300 rounded-full hover:bg-violet-500/30 transition-colors border border-violet-500/30"
+                            className="px-3 py-1.5 text-xs bg-teal-500/20 text-teal-300 rounded-full hover:bg-teal-500/30 transition-colors border border-teal-500/30"
                           >
                             {btn.label}
                           </button>
@@ -692,13 +694,13 @@ ${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` :
                 ))}
                 {netnextTyping && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4 text-white" />
+                    <div className="flex-shrink-0">
+                      <NetNextSiriOrb size={32} isHovered={true} />
                     </div>
                     <div className="flex gap-1 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl rounded-bl-sm">
-                      <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <div className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                     </div>
                   </motion.div>
                 )}
@@ -712,12 +714,12 @@ ${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` :
                   onChange={(e) => setNetnextInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendNetnextMessage()}
                   placeholder="Напиши сообщение..."
-                  className="w-full px-4 py-3.5 pr-14 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500/50 transition-colors"
+                  className="w-full px-4 py-3.5 pr-14 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500/50 transition-colors"
                 />
                 <button
                   onClick={() => sendNetnextMessage()}
                   disabled={!netnextInput.trim() || netnextTyping}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg bg-violet-500 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-violet-400 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg bg-teal-500 text-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-teal-400 transition-colors"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -793,7 +795,7 @@ ${businessDesc ? `\nЯ уже знаю, что у тебя: "${businessDesc}"` :
       </main>
 
       <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
-        <SiriOrb size={48} color={step === "netnext-chat" ? "#8b5cf6" : "#00ffff"} state={isTyping || isAnalyzing || isCreating || isThinking || netnextTyping ? "thinking" : "idle"} onClick={handleOrbClick} />
+        <SiriOrb size={48} color="#00ffff" state={isTyping || isAnalyzing || isCreating || isThinking || netnextTyping ? "thinking" : "idle"} onClick={handleOrbClick} />
       </div>
 
       <AnimatePresence>
