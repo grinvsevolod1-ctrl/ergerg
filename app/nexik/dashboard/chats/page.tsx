@@ -126,8 +126,7 @@ export default function ChatsPage() {
       } else {
         setError(data.error || 'Ошибка загрузки')
       }
-    } catch (err) {
-      console.error('[Chats] Load error:', err)
+    } catch {
       setError('Не удалось загрузить диалоги')
     } finally {
       setLoading(false)

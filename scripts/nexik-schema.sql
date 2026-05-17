@@ -430,6 +430,21 @@ CREATE TABLE IF NOT EXISTS nexik_support_requests (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Webhooks table
+CREATE TABLE IF NOT EXISTS nexik_webhooks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  events TEXT[] NOT NULL DEFAULT '{"message.new"}',
+  secret TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  last_triggered_at TIMESTAMPTZ,
+  last_status INTEGER,
+  created_by UUID REFERENCES nexik_org_members(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- =====================================================
 -- INDEXES
 -- =====================================================
@@ -475,6 +490,8 @@ CREATE INDEX IF NOT EXISTS idx_nexik_rate_limits_key ON nexik_rate_limits(key, w
 
 CREATE INDEX IF NOT EXISTS idx_nexik_support_email ON nexik_support_requests(email);
 CREATE INDEX IF NOT EXISTS idx_nexik_support_status ON nexik_support_requests(status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_nexik_webhooks_org ON nexik_webhooks(org_id, is_active);
 
 -- Vector search index (HNSW for fast similarity search)
 CREATE INDEX IF NOT EXISTS idx_nexik_chunks_embedding 
