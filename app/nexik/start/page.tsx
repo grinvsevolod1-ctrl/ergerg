@@ -608,73 +608,78 @@ export default function NexikStartPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="flex-1 flex flex-col"
+              className="flex-1 flex flex-col min-h-0 max-h-full"
             >
               {/* Header чата */}
-              <div className="flex items-center gap-3 pb-4 mb-4 border-b border-white/10">
+              <div className="flex-shrink-0 flex items-center gap-3 pb-4 mb-4 border-b border-white/10">
                 <div className="relative">
                   <div className="absolute inset-[-4px] rounded-full bg-teal-500/20 blur-md" />
                   <NetNextSiriOrb size={44} isHovered={netnextTyping} />
                 </div>
-                <div>
-                  <div className="font-medium text-teal-300">NetNext AI</div>
-                  <div className="text-xs text-zinc-500">Онлайн</div>
+                <div className="flex-1">
+                  <div className="font-semibold text-white">NetNext AI</div>
+                  <div className="text-xs text-teal-400">Онлайн</div>
                 </div>
                 <button 
                   onClick={() => setStep("offer")} 
-                  className="ml-auto p-2 rounded-lg hover:bg-white/5 transition-colors"
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors"
                 >
                   <X className="w-5 h-5 text-zinc-400" />
                 </button>
               </div>
 
-              {/* Сообщения */}
-              <div ref={netnextChatRef} className="flex-1 space-y-4 mb-4 overflow-y-auto">
+              {/* Сообщения - фиксированная высота с внутренним скроллом */}
+              <div 
+                ref={netnextChatRef} 
+                className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+              >
                 {netnextMessages.map((msg, i) => (
                   <motion.div
                     key={msg.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className={cn("flex flex-col", msg.role === "user" ? "items-end" : "items-start")}
+                    transition={{ delay: i * 0.03 }}
+                    className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
                   >
-                    <div className="flex items-end gap-2">
-                      {msg.role === "assistant" && (
-                        <div className="flex-shrink-0">
-                          <NetNextSiriOrb size={32} />
+                    <div className={cn("flex flex-col", msg.role === "user" ? "items-end" : "items-start", "max-w-[85%]")}>
+                      <div className="flex items-end gap-2">
+                        {msg.role === "assistant" && (
+                          <div className="flex-shrink-0 mb-1">
+                            <NetNextSiriOrb size={28} />
+                          </div>
+                        )}
+                        <div className={cn(
+                          "px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
+                          msg.role === "user"
+                            ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-medium rounded-br-md"
+                            : "bg-zinc-800/80 border border-zinc-700/50 text-zinc-100 rounded-bl-md"
+                        )}>
+                          <span className="whitespace-pre-line">{msg.content}</span>
+                        </div>
+                      </div>
+                      {/* Кнопки */}
+                      {msg.buttons && msg.buttons.length > 0 && (
+                        <div className={cn("flex flex-wrap gap-2 mt-2", msg.role === "assistant" && "ml-9")}>
+                          {msg.buttons.map((btn, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleNetnextButton(btn.action)}
+                              className="px-3 py-1.5 text-xs font-medium bg-teal-500/10 text-teal-300 rounded-lg hover:bg-teal-500/20 transition-colors border border-teal-500/20"
+                            >
+                              {btn.label}
+                            </button>
+                          ))}
                         </div>
                       )}
-                      <div className={cn(
-                        "max-w-[85%] px-4 py-3 rounded-2xl text-sm whitespace-pre-line",
-                        msg.role === "user"
-                          ? "bg-teal-500 text-black rounded-br-sm"
-                          : "bg-white/5 border border-white/10 rounded-bl-sm"
-                      )}>
-                        {msg.content}
-                      </div>
                     </div>
-                    {/* Кнопки */}
-                    {msg.buttons && msg.buttons.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2 ml-10">
-                        {msg.buttons.map((btn, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => handleNetnextButton(btn.action)}
-                            className="px-3 py-1.5 text-xs bg-teal-500/20 text-teal-300 rounded-full hover:bg-teal-500/30 transition-colors border border-teal-500/30"
-                          >
-                            {btn.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </motion.div>
                 ))}
                 {netnextTyping && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                    <div className="flex-shrink-0">
-                      <NetNextSiriOrb size={32} isHovered={true} />
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-end gap-2">
+                    <div className="flex-shrink-0 mb-1">
+                      <NetNextSiriOrb size={28} isHovered={true} />
                     </div>
-                    <div className="flex gap-1 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl rounded-bl-sm">
+                    <div className="flex gap-1.5 px-4 py-3 bg-zinc-800/80 border border-zinc-700/50 rounded-2xl rounded-bl-md">
                       <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                       <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                       <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -684,22 +689,24 @@ export default function NexikStartPage() {
               </div>
 
               {/* Поле ввода */}
-              <div className="relative">
-                <input
-                  type="text"
-                  value={netnextInput}
-                  onChange={(e) => setNetnextInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && sendNetnextMessage()}
-                  placeholder="Напиши сообщение..."
-                  className="w-full px-4 py-3.5 pr-14 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500/50 transition-colors"
-                />
-                <button
-                  onClick={() => sendNetnextMessage()}
-                  disabled={!netnextInput.trim() || netnextTyping}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg bg-teal-500 text-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-teal-400 transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
+              <div className="flex-shrink-0 pt-4 mt-auto">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={netnextInput}
+                    onChange={(e) => setNetnextInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendNetnextMessage()}
+                    placeholder="Напиши сообщение..."
+                    className="w-full px-4 py-3.5 pr-14 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500/50 focus:bg-zinc-800/80 transition-all"
+                  />
+                  <button
+                    onClick={() => sendNetnextMessage()}
+                    disabled={!netnextInput.trim() || netnextTyping}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 text-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:from-teal-400 hover:to-cyan-400 transition-all"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
