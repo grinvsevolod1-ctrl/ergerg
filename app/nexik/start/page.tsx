@@ -148,7 +148,7 @@ export default function NexikStartPage() {
 **NetNext** - это молодая, но амбициозная веб-студия. Мы делаем современные сайты быстро и качественно.
 
 **Специальное предложение для тебя:**
-Сайт с полной интеграцией Nexik AI всего за **300 рублей** и **24 часа работы**!
+Сайт с полной интеграцией Nexik AI всего за **3 BYN** и **24 часа работы**!
 
 В эту цену входит:
 - Современный адаптивный дизайн
@@ -518,7 +518,7 @@ export default function NexikStartPage() {
                 transition={{ delay: 0.2 }}
                 className="text-zinc-400 mb-8 max-w-sm text-sm sm:text-base leading-relaxed"
               >
-                Создадим тебе современный сайт с уже встроенным{" "}
+                Создадим тебе современный сайт с у��е встроенным{" "}
                 <span className="text-cyan-400 font-medium">Nexik AI</span>
                 {" "}—{" "}
                 <span className="text-white">твой бизнес будет на связи 24/7</span>

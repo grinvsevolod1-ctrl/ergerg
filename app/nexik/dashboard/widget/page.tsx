@@ -53,8 +53,8 @@ export default function WidgetSettingsPage() {
             botName: data.widget.name || prev.botName,
           }))
         }
-      } catch (err) {
-        console.error('[Widget] Load error:', err)
+      } catch {
+        // Silent fail
       } finally {
         setLoading(false)
       }
@@ -82,8 +82,8 @@ export default function WidgetSettingsPage() {
           }
         })
       })
-    } catch (err) {
-      console.error('[Widget] Save error:', err)
+    } catch {
+      // Silent fail
     } finally {
       setSaving(false)
     }

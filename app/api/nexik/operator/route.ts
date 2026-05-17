@@ -39,10 +39,8 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     }
     
-    // Log for monitoring
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[Nexik Operator] Request:`, JSON.stringify(requestData, null, 2))
-    }
+    // In production, save to database and trigger webhook
+    // requestData is ready for database storage
 
     // Simulate webhook notification
     // In production, this would send to client's configured webhook URL
@@ -55,8 +53,7 @@ export async function POST(request: NextRequest) {
       queuePosition: 1, // Placeholder
     })
 
-  } catch (error) {
-    console.error('[Nexik Operator API error]', error)
+  } catch {
     return NextResponse.json(
       { error: 'Failed to notify operator' },
       { status: 500 }

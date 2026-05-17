@@ -36,8 +36,7 @@ export default function ApiKeysPage() {
       if (data.success) {
         setApiKeys(data.keys)
       }
-    } catch (err) {
-      console.error('Failed to load API keys:', err)
+    } catch {
       setError('Не удалось загрузить ключи')
     } finally {
       setLoading(false)
@@ -70,8 +69,7 @@ export default function ApiKeysPage() {
       } else {
         setError(data.error || 'Не удалось создать ключ')
       }
-    } catch (err) {
-      console.error('Failed to create API key:', err)
+    } catch {
       setError('Ошибка при создании ключа')
     } finally {
       setCreating(false)
@@ -98,8 +96,8 @@ export default function ApiKeysPage() {
       if (data.success) {
         setApiKeys(apiKeys.filter(k => k.id !== id))
       }
-    } catch (err) {
-      console.error('Failed to delete API key:', err)
+    } catch {
+      // Silent fail
     } finally {
       setDeleting(null)
     }
@@ -321,7 +319,7 @@ export default function ApiKeysPage() {
             </h4>
             <ul className="text-sm text-[#888] space-y-1">
               <li>• Храните ключ в переменных окружения, не в коде</li>
-              <li>• Не передавайте ключ на клиентскую сторону</li>
+              <li>• Не передавайте ключ на кл��ентскую сторону</li>
               <li>• Регулярно ротируйте ключи для безопасности</li>
               <li>• Используйте разные ключи для dev и production</li>
             </ul>

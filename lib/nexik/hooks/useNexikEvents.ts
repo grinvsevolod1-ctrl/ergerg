@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { NotificationSound } from '@/lib/nexik/services/notification-sound'
 
 type EventType = 'new_message' | 'new_conversation' | 'operator_joined' | 'stats_update' | 'connected'
 
@@ -20,6 +21,7 @@ interface UseNexikEventsOptions {
   onConnect?: () => void
   onDisconnect?: () => void
   enabled?: boolean
+  playSound?: boolean
 }
 
 export function useNexikEvents({
@@ -29,12 +31,21 @@ export function useNexikEvents({
   onStatsUpdate,
   onConnect,
   onDisconnect,
-  enabled = true
+  enabled = true,
+  playSound = true
 }: UseNexikEventsOptions) {
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const notificationSound = useRef<NotificationSound | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [lastEvent, setLastEvent] = useState<NexikEvent | null>(null)
+
+  // Initialize notification sound
+  useEffect(() => {
+    if (playSound && typeof window !== 'undefined') {
+      notificationSound.current = new NotificationSound()
+    }
+  }, [playSound])
 
   const connect = useCallback(() => {
     if (!orgId || !enabled) return
@@ -63,10 +74,12 @@ export function useNexikEvents({
             break
           
           case 'new_message':
+            if (playSound) notificationSound.current?.playMessage()
             onMessage?.(data.data as { conversationId: string; message: unknown })
             break
           
           case 'new_conversation':
+            if (playSound) notificationSound.current?.playNewConversation()
             onNewConversation?.(data.data as { conversationId: string; visitor: unknown })
             break
           
@@ -74,8 +87,8 @@ export function useNexikEvents({
             onStatsUpdate?.(data.data)
             break
         }
-      } catch (error) {
-        console.error('[Nexik Events] Parse error:', error)
+      } catch {
+        // Parse error - silent fail
       }
     }
 

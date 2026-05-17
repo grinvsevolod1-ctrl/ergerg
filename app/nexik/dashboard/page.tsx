@@ -104,8 +104,7 @@ export default function NexikDashboardPage() {
       } else {
         setError(data.error || 'Ошибка загрузки')
       }
-    } catch (err) {
-      console.error('[Dashboard] Failed to load stats:', err)
+    } catch {
       setError('Не удалось загрузить данные')
     } finally {
       setLoading(false)
