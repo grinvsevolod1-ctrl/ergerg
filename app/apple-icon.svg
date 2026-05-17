@@ -1,0 +1,24 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="nGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="180" height="180" rx="40" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle border -->
+  <rect x="1" y="1" width="178" height="178" rx="39" stroke="url(#nGrad)" stroke-opacity="0.3" stroke-width="2"/>
+  
+  <!-- Letter N -->
+  <path d="M50 130V50h14l52 60V50h14v80h-14l-52-60v60H50z" fill="url(#nGrad)"/>
+  
+  <!-- Corner accent -->
+  <path d="M180 135v45h-45a45 45 0 0 0 45-45z" fill="#22d3ee" fill-opacity="0.5"/>
+</svg>

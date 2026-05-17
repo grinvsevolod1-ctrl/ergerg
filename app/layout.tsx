@@ -1,0 +1,159 @@
+import React from "react"
+import type { Metadata, Viewport } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+
+import './globals.css'
+
+const geistSans = Geist({ 
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-geist-sans",
+});
+const geistMono = Geist_Mono({ 
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+});
+
+export const metadata: Metadata = {
+  metadataBase: new URL('https://netnext.site'),
+  title: {
+    default: 'NetNext - Веб-студия разработки | Минск, Беларусь',
+    template: '%s | NetNext'
+  },
+  description: 'Создаём современные сайты и веб-приложения. Веб-разработка, мобильные приложения, UI/UX дизайн, AI-решения. NetNext Studio - ваш партнёр в цифровом мире. Беларусь, Минск.',
+  keywords: [
+    'веб-разработка',
+    'создание сайтов',
+    'веб-студия Минск',
+    'разработка приложений',
+    'UI/UX дизайн',
+    'мобильные приложения',
+    'Next.js разработка',
+    'React разработка',
+    'AI решения',
+    'netnext',
+    'веб-студия Беларусь',
+    'заказать сайт',
+    'разработка сайтов под ключ'
+  ],
+  authors: [{ name: 'NetNext Studio', url: 'https://netnext.site' }],
+  creator: 'NetNext Studio',
+  publisher: 'ООО "НетНекст"',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
+  manifest: '/manifest.json',
+  openGraph: {
+    type: 'website',
+    locale: 'ru_BY',
+    url: 'https://netnext.site',
+    siteName: 'NetNext Studio',
+    title: 'NetNext - Веб-студия разработки',
+    description: 'Создаём современные сайты и веб-приложения. Веб-разработка, мобильные приложения, UI/UX дизайн, AI-решения.',
+    images: [
+      {
+        url: '/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'NetNext - Веб-студия разработки',
+      }
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'NetNext - Веб-студия разработки',
+    description: 'Создаём современные сайты и веб-приложения. Веб-разработка, мобильные приложения, UI/UX дизайн.',
+    images: ['/og-image.jpg'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  alternates: {
+    canonical: 'https://netnext.site',
+    languages: {
+      'ru-BY': 'https://netnext.site',
+    },
+  },
+  category: 'technology',
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#0a0a0f' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0f' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: 'cover',
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <html lang="ru" className="bg-background">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": "NetNext Studio",
+              "legalName": "ООО \"НетНекст\"",
+              "url": "https://netnext.site",
+              "logo": "https://netnext.site/icon.svg",
+              "description": "Веб-студия разработки современных сайтов и приложений",
+              "taxID": "193962237",
+              "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "ул. Фабрициуса 9, пом. 1 (кабинет 31)",
+                "addressLocality": "Минск",
+                "postalCode": "220007",
+                "addressRegion": "Московский район",
+                "addressCountry": "BY"
+              },
+              "contactPoint": {
+                "@type": "ContactPoint",
+                "email": "hello@netnext.site",
+                "contactType": "customer service",
+                "availableLanguage": ["Russian", "English"]
+              },
+              "sameAs": [
+                "https://t.me/netnextadminbot"
+              ],
+              "areaServed": {
+                "@type": "Country",
+                "name": "Belarus"
+              },
+              "priceRange": "BrBr"
+            })
+          }}
+        />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
+        {children}
+      </body>
+    </html>
+  )
+}
