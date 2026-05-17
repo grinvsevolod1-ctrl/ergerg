@@ -64,10 +64,20 @@ export async function GET(req: NextRequest) {
     return new Response('Missing org_id', { status: 400 })
   }
 
-  // Проверяем авторизацию
-  const token = req.cookies.get('nexik_token')?.value
-  if (!token) {
+  // Проверяем авторизацию (nexik_session - единый cookie)
+  const sessionToken = req.cookies.get('nexik_session')?.value
+  if (!sessionToken) {
     return new Response('Unauthorized', { status: 401 })
+  }
+  
+  // Validate session belongs to this org
+  try {
+    const payload = JSON.parse(atob(sessionToken.split('.')[1]))
+    if (payload.orgId !== orgId) {
+      return new Response('Forbidden', { status: 403 })
+    }
+  } catch {
+    return new Response('Invalid session', { status: 401 })
   }
 
   const stream = new ReadableStream({

@@ -194,7 +194,7 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
         visitorPhone: request.visitor_info?.phone,
         firstMessage: request.message,
         pageUrl: request.page_url,
-        dashboardUrl: process.env.NEXT_PUBLIC_BASE_URL || 'https://netnext.site/nexik/dashboard'
+        dashboardUrl: process.env.NEXT_PUBLIC_BASE_URL || 'https://nexik.org/nexik/dashboard'
       })
     }
     
@@ -226,7 +226,7 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
         visitorName: request.visitor_info?.name,
         message: request.message,
         pageUrl: request.page_url,
-        dashboardUrl: process.env.NEXT_PUBLIC_BASE_URL || 'https://netnext.site/nexik/dashboard'
+        dashboardUrl: process.env.NEXT_PUBLIC_BASE_URL || 'https://nexik.org/nexik/dashboard'
       })
     }
     

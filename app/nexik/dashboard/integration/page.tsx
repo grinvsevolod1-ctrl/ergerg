@@ -3,6 +3,7 @@
 import { Suspense } from 'react'
 import { useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
+import { useNexikAuth } from "@/lib/nexik/contexts/auth-context"
 import {
   Copy,
   Check,
@@ -154,7 +155,7 @@ const registrarInstructions: Record<string, {
       "Нажмите на нужный домен → «Управление DNS»",
       "Нажмите «Добавить запись» → выберите CNAME",
       "В поле «Имя» введите: chat",
-      "В поле «Значение» введите: widget.netnext.site",
+      "В поле «Значение» введите: widget.nexik.org",
       "TTL оставьте по умолчанию (3600)",
       "Нажмите «Добавить»"
     ]
@@ -169,7 +170,7 @@ const registrarInstructions: Record<string, {
       "Прокрутите вниз до «CNAME записи»",
       "Нажмите «Добавить»",
       "Субдомен: chat",
-      "Каноническое имя: widget.netnext.site",
+      "Каноническое имя: widget.nexik.org",
       "Нажмите «Изменить»"
     ]
   },
@@ -183,7 +184,7 @@ const registrarInstructions: Record<string, {
       "Нажмите «Добавить запись»",
       "Тип: CNAME",
       "Имя: chat",
-      "Значение: widget.netnext.site",
+      "Значение: widget.nexik.org",
       "Сохраните изменения"
     ]
   },
@@ -197,7 +198,7 @@ const registrarInstructions: Record<string, {
       "В разделе Records нажмите Add",
       "Type: CNAME",
       "Name: chat",
-      "Value: widget.netnext.site",
+      "Value: widget.nexik.org",
       "TTL: 1 Hour",
       "Save"
     ]
@@ -212,7 +213,7 @@ const registrarInstructions: Record<string, {
       "Нажмите Add New Record",
       "Type: CNAME Record",
       "Host: chat",
-      "Value: widget.netnext.site",
+      "Value: widget.nexik.org",
       "Save All Changes"
     ]
   },
@@ -226,7 +227,7 @@ const registrarInstructions: Record<string, {
       "Нажмите Add record",
       "Type: CNAME",
       "Name: chat",
-      "Target: widget.netnext.site",
+      "Target: widget.nexik.org",
       "Proxy status: DNS only (серая иконка облака)",
       "Save"
     ]
@@ -240,7 +241,7 @@ const registrarInstructions: Record<string, {
       "Нажмите «Добавить запись»",
       "Тип: CNAME",
       "Имя: chat",
-      "Значение: widget.netnext.site.",
+      "Значение: widget.nexik.org.",
       "Обратите внимание: точка в конце обязательна!",
       "Сохраните"
     ]
@@ -254,7 +255,7 @@ const registrarInstructions: Record<string, {
       "Нажмите «DNS-зона»",
       "Добавьте CNAME запись:",
       "Поддомен: chat",
-      "Хост: widget.netnext.site",
+      "Хост: widget.nexik.org",
       "Примените изменения"
     ]
   }
@@ -262,6 +263,7 @@ const registrarInstructions: Record<string, {
 
 function IntegrationContent() {
   const searchParams = useSearchParams()
+  const { session } = useNexikAuth()
   const [widgetId, setWidgetId] = useState("")
   const [copied, setCopied] = useState(false)
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>("tilda")
@@ -291,12 +293,30 @@ function IntegrationContent() {
     }
   }, [searchParams])
 
+  // Get widget ID from session or fetch from API
   useEffect(() => {
-    const id = localStorage.getItem('nexik_widget_id') || 'nxk_demo123'
-    setWidgetId(id)
-  }, [])
+    const loadWidgetId = async () => {
+      if (session?.org?.slug) {
+        // Use org slug as fallback widget identifier
+        setWidgetId(session.org.slug)
+      }
+      
+      // Try to load actual widget ID from API
+      try {
+        const res = await fetch('/api/nexik/dashboard/widget')
+        const data = await res.json()
+        if (data.success && data.widget?.id) {
+          setWidgetId(data.widget.id)
+        }
+      } catch (err) {
+        console.error('Failed to load widget ID:', err)
+      }
+    }
+    
+    loadWidgetId()
+  }, [session])
 
-  const widgetCode = `<script src="https://netnext.site/widget.js" data-id="${widgetId}"></script>`
+  const widgetCode = `<script src="https://nexik.org/nexik/widget.js" data-id="${widgetId}"></script>`
 
   const copyCode = () => {
     navigator.clipboard.writeText(widgetCode)
@@ -381,7 +401,7 @@ function IntegrationContent() {
       })
       setHelpFormSubmitted(true)
     } catch {
-      alert("Ошибка отправки. Попробуйте написать на support@netnext.site")
+      alert("Ошибка отправки. Попробуйте написать на support@nexik.org")
     }
   }
 
@@ -433,7 +453,7 @@ function IntegrationContent() {
               ) : (
                 <>
                   <Copy className="w-4 h-4" />
-                  Копировать
+                  Коп��ровать
                 </>
               )}
             </Button>
@@ -559,7 +579,7 @@ function IntegrationContent() {
             </div>
             <div className="text-left">
               <h2 className="text-lg font-semibold">Настройка своего домена</h2>
-              <p className="text-sm text-zinc-500">Используйте chat.ваш-сайт.com вместо netnext.site</p>
+              <p className="text-sm text-zinc-500">Используйте chat.ваш-сайт.com вместо nexik.org</p>
             </div>
           </div>
           <ChevronRight className={cn("w-5 h-5 text-zinc-500 transition-transform", showCnameInstructions && "rotate-90")} />
@@ -571,7 +591,7 @@ function IntegrationContent() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-zinc-500">Тип записи:</span><span className="ml-2 text-[#00ffff] font-mono">CNAME</span></div>
                 <div><span className="text-zinc-500">Имя/Host:</span><span className="ml-2 text-[#00ffff] font-mono">chat</span></div>
-                <div className="col-span-2"><span className="text-zinc-500">Значение/Target:</span><span className="ml-2 text-[#00ffff] font-mono">widget.netnext.site</span></div>
+                <div className="col-span-2"><span className="text-zinc-500">Значение/Target:</span><span className="ml-2 text-[#00ffff] font-mono">widget.nexik.org</span></div>
               </div>
             </div>
             <p className="text-sm text-zinc-400 mb-4">Выберите вашего регистратора для подробной инструкции:</p>
@@ -691,7 +711,7 @@ function IntegrationContent() {
           ))}
         </div>
         <div className="mt-4 p-4 rounded-xl bg-[#12121a] border border-[#2a2a3e]">
-          <h4 className="font-medium mb-2">Пример использования (Next.js)</h4>
+          <h4 className="font-medium mb-2">Пример исполь��ования (Next.js)</h4>
           <pre className="text-xs text-[#00ff88] overflow-x-auto">
 {`// app/layout.tsx
 import { NexikWidget } from '@nexik/next'

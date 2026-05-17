@@ -25,8 +25,8 @@ export default function NexikDemoPage() {
 
   const embedCode = `<!-- Nexik AI Chat Widget -->
 <script 
-  src="${baseUrl}/nexik/widget.js"
-  data-client-id="${config.clientId}"
+  src="https://nexik.org/nexik/widget.js"
+  data-id="${config.clientId}"
   data-color="${config.color}"
   data-position="${config.position}"
   data-greeting="${config.greeting}"
@@ -343,12 +343,11 @@ export default function NexikDemoPage() {
       {/* Load the widget */}
       <Script
         src="/nexik/widget.js"
-        data-client-id={config.clientId}
+        data-id={config.clientId}
         data-color={config.color}
         data-position={config.position}
         data-greeting={config.greeting}
         data-bot-name={config.botName}
-        data-api-url=""
         strategy="lazyOnload"
       />
     </div>
