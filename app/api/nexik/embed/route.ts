@@ -24,13 +24,13 @@ export async function GET(request: NextRequest) {
     botName: searchParams.get('botName') || 'AI Ассистент',
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://netnext.site'
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://nexik.org'
 
   // Генерируем embed код
   const embedCode = `<!-- Nexik AI Chat Widget -->
 <script 
   src="${baseUrl}/nexik/widget.js"
-  data-client-id="${config.clientId}"
+  data-id="${config.clientId}"
   data-color="${config.color}"
   data-position="${config.position}"
   data-greeting="${config.greeting}"
@@ -74,10 +74,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://netnext.site'
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://nexik.org'
 
     const attributes = [
-      `data-client-id="${config.clientId}"`,
+      `data-id="${config.clientId}"`,
       config.color && `data-color="${config.color}"`,
       config.position && `data-position="${config.position}"`,
       config.greeting && `data-greeting="${config.greeting}"`,

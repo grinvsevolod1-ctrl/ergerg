@@ -568,7 +568,7 @@
           </div>
           <button class="nexik-send" aria-label="Отправить">${icons.send}</button>
         </div>
-        <div class="nexik-footer">Powered by <a href="https://netnext.site/nexik" target="_blank" rel="noopener">Nexik</a></div>
+        <div class="nexik-footer">Powered by <a href="https://nexik.org" target="_blank" rel="noopener">Nexik</a></div>
       </div>
     `;
 

@@ -30,7 +30,7 @@ export default function HelpPage() {
           <div>
             <h2 className="text-lg font-semibold mb-2">Нужна помощь?</h2>
             <p className="text-muted-foreground">
-              Свяжитесь с нами по email: <a href="mailto:hello@netnext.site" className="text-primary">hello@netnext.site</a>
+              Свяжитесь с нами по email: <a href="mailto:support@nexik.org" className="text-primary">support@nexik.org</a>
             </p>
           </div>
         </div>

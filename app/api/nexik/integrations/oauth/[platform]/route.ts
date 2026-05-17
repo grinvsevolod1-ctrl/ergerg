@@ -63,7 +63,7 @@ export async function GET(
       }, { status: 501 })
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://netnext.site"
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://nexik.org"
     const redirectUri = `${baseUrl}/api/nexik/integrations/oauth/${platform}/callback`
     const state = Buffer.from(JSON.stringify({ widgetId, shop })).toString("base64")
 
@@ -121,7 +121,7 @@ export async function POST(
     const stateData = JSON.parse(Buffer.from(state, "base64").toString())
     const { widgetId } = stateData
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://netnext.site"
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://nexik.org"
     const redirectUri = `${baseUrl}/api/nexik/integrations/oauth/${platform}/callback`
 
     let tokenUrl = config.tokenUrl
@@ -194,7 +194,7 @@ export async function POST(
 
 async function installShopifyWidget(shop: string, accessToken: string, widgetId: string) {
   try {
-    const widgetScript = `https://netnext.site/widget.js`
+    const widgetScript = `https://nexik.org/widget.js`
     
     const response = await fetch(`https://${shop}.myshopify.com/admin/api/2024-01/script_tags.json`, {
       method: "POST",
@@ -238,7 +238,7 @@ async function installWixWidget(accessToken: string, widgetId: string) {
 async function installSquarespaceWidget(accessToken: string, widgetId: string) {
   try {
     // Squarespace uses code injection API
-    const widgetCode = `<script src="https://netnext.site/widget.js" data-id="${widgetId}"></script>`
+    const widgetCode = `<script src="https://nexik.org/widget.js" data-id="${widgetId}"></script>`
     
     // Get site ID first
     const siteResponse = await fetch("https://api.squarespace.com/1.0/authorization/website", {
@@ -278,7 +278,7 @@ async function installWordPressWidget(accessToken: string, widgetId: string) {
   try {
     // WordPress.com REST API to add widget
     // This requires the Jetpack plugin or WordPress.com site
-    const widgetCode = `<script src="https://netnext.site/widget.js" data-id="${widgetId}"></script>`
+    const widgetCode = `<script src="https://nexik.org/widget.js" data-id="${widgetId}"></script>`
     
     // Get site info
     const siteResponse = await fetch("https://public-api.wordpress.com/rest/v1.1/me/sites", {

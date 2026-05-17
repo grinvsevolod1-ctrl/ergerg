@@ -57,7 +57,7 @@ function NexikWidgetClient({
     if (existingScript) return
 
     const script = document.createElement("script")
-    script.src = "https://netnext.site/widget.js"
+    script.src = "https://nexik.org/nexik/widget.js"
     script.async = true
     script.setAttribute("data-nexik-widget", "true")
     script.setAttribute("data-id", clientId)

@@ -52,8 +52,8 @@ OLLAMA_MODEL=qwen2.5:7b
 # JWT секрет (обязательно)
 NEXIK_JWT_SECRET=your-secret-key-32-chars-minimum
 
-# Base URL для ссылок в Telegram (опционально)
-NEXT_PUBLIC_BASE_URL=https://netnext.site
+# Base URL для ссылок в Telegram и виджета
+NEXT_PUBLIC_BASE_URL=https://nexik.org
 ```
 
 ### 2. Миграция базы данных
@@ -176,7 +176,7 @@ curl http://localhost:3000/api/nexik/onboarding \
 4. UI обновляется без перезагрузки
 
 ### События:
-- `new_message` — новое сообщение в диалоге
+- `new_message` — новое сообщение в д��алоге
 - `new_conversation` — новый диалог
 - `stats_update` — обновление статистики
 
@@ -248,9 +248,9 @@ WHERE id = 'org_id';
 ## Авторизация
 
 ### Как работает:
-1. Пользователь проходит онбординг → создаётся org + member + widget
+1. Пользователь проходит онбординг -> создаётся org + member + widget
 2. Генерируется пароль, показывается один раз
-3. JWT токен сохраняется в httpOnly cookie `nexik_token`
+3. JWT токен сохраняется в httpOnly cookie `nexik_session`
 4. `middleware.ts` проверяет токен для `/nexik/dashboard/*`
 
 ### Демо-режим:
@@ -285,7 +285,7 @@ Password: test123
 
 ### Простая интеграция:
 ```html
-<script src="https://netnext.site/nexik/widget.js" data-id="nxk_xxx" async></script>
+<script src="https://nexik.org/nexik/widget.js" data-id="nxk_xxx" async></script>
 ```
 
 ### Программная:
@@ -334,7 +334,7 @@ curl -X POST http://localhost:3000/api/nexik/v1/chat \
 ### SSE события:
 ```bash
 curl -N "http://localhost:3000/api/nexik/events?org_id=xxx" \
-  -H "Cookie: nexik_token=xxx"
+  -H "Cookie: nexik_session=xxx"
 ```
 
 ---

@@ -184,7 +184,7 @@ export function NexikChat({
   // Server access - auto-sync settings
   useEffect(() => {
     if (serverAccess?.enabled && serverAccess.autoSync && serverAccess.apiKey) {
-      fetch(`https://netnext.site/api/nexik/widget-config?clientId=${clientId}`, {
+      fetch(`https://nexik.org/api/nexik/widget-config?clientId=${clientId}`, {
         headers: { "Authorization": `Bearer ${serverAccess.apiKey}` }
       })
         .then(res => res.json())
@@ -246,7 +246,7 @@ export function NexikChat({
     try {
       const baseUrl = typeof window !== "undefined" && window.location.hostname === "localhost"
         ? "/api/nexik/chat"
-        : "https://netnext.site/api/nexik/chat"
+        : "https://nexik.org/api/nexik/chat"
 
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (serverAccess?.apiKey) {
@@ -547,7 +547,7 @@ export function useNexik(clientId: string, serverAccess?: ServerAccessConfig) {
   useEffect(() => {
     // Initialize connection
     if (serverAccess?.enabled && serverAccess.apiKey) {
-      fetch(`https://netnext.site/api/nexik/verify?clientId=${clientId}`, {
+      fetch(`https://nexik.org/api/nexik/verify?clientId=${clientId}`, {
         headers: { "Authorization": `Bearer ${serverAccess.apiKey}` }
       })
         .then(() => setIsReady(true))

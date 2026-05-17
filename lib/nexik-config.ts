@@ -19,7 +19,7 @@ export const nexikConfig = {
 
   // Widget Settings
   widget: {
-    domain: process.env.NEXIK_WIDGET_DOMAIN || "https://netnext.site",
+    domain: process.env.NEXIK_WIDGET_DOMAIN || "https://nexik.org",
     defaultColor: "#4fd1c5",
     defaultPosition: "bottom-right" as const,
     defaultMode: "modal" as const,
