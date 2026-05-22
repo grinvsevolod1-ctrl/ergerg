@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimiters } from '@/lib/rate-limit'
 import { routedChat, AI_SERVERS } from '@/lib/ai/router'
-import { createClient } from '@/lib/supabase/server'
+import { query, execute } from '@/lib/db'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -276,16 +276,11 @@ async function saveInteraction(
   source: string
 ) {
   try {
-    const supabase = await createClient()
-    
-    await supabase.from('netnext_chat_logs').insert({
-      visitor_id: visitorId || 'anonymous',
-      user_message: userMessage,
-      ai_response: aiResponse,
-      intent,
-      source,
-      created_at: new Date().toISOString()
-    })
+    await execute(
+      `INSERT INTO netnext_chat_logs (visitor_id, user_message, ai_response, intent, source, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      [visitorId || 'anonymous', userMessage, aiResponse, intent, source]
+    )
   } catch (error) {
     console.error('[NetNext Chat] Failed to save interaction:', error)
   }
@@ -294,14 +289,11 @@ async function saveInteraction(
 // Save feedback for learning
 async function saveFeedback(messageId: string, reaction: string, visitorId?: string) {
   try {
-    const supabase = await createClient()
-    
-    await supabase.from('netnext_chat_feedback').insert({
-      message_id: messageId,
-      reaction,
-      visitor_id: visitorId || 'anonymous',
-      created_at: new Date().toISOString()
-    })
+    await execute(
+      `INSERT INTO netnext_chat_feedback (message_id, reaction, visitor_id, created_at)
+       VALUES ($1, $2, $3, NOW())`,
+      [messageId, reaction, visitorId || 'anonymous']
+    )
   } catch (error) {
     console.error('[NetNext Chat] Failed to save feedback:', error)
   }
