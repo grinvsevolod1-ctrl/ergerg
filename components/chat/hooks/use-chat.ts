@@ -174,30 +174,52 @@ export function useChat(options: UseChatOptions) {
     setIsConnectedToOperator(true)
     options.onOperatorConnected?.()
     
-    const systemMessage: ChatMessage = {
+    // Show connecting message
+    const connectingMessage: ChatMessage = {
       id: generateId(),
       role: 'system',
-      content: 'Вы подключены к оператору. Ожидайте ответа.',
+      content: 'Подключаем оператора...',
       timestamp: new Date(),
     }
+    setMessages(prev => [...prev, connectingMessage])
     
-    setMessages(prev => [...prev, systemMessage])
-    
-    // В nexik режиме можно отправить webhook о запросе оператора
-    if (config.mode === 'nexik' && config.clientId) {
-      try {
-        await fetch('/api/nexik/operator', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientId: config.clientId,
-            sessionId,
-            messages: messages.slice(-10),
-          }),
-        })
-      } catch {
-        // Ignore - operator notification is optional
-      }
+    try {
+      // Determine API endpoint based on mode
+      const operatorEndpoint = config.mode === 'nexik' 
+        ? '/api/nexik/operator' 
+        : '/api/chat/operator'
+      
+      const response = await fetch(operatorEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: config.clientId,
+          sessionId,
+          visitorId: sessionId,
+          conversationHistory: messages.slice(-10).map(m => ({
+            role: m.role,
+            content: m.content
+          })),
+          currentPage: typeof window !== 'undefined' ? window.location.pathname : '/'
+        }),
+      })
+      
+      const data = await response.json()
+      
+      // Update message with result
+      setMessages(prev => prev.map(m => 
+        m.id === connectingMessage.id 
+          ? { ...m, content: data.message || 'Оператор получил уведомление. Ожидайте ответа (2-5 минут).' }
+          : m
+      ))
+      
+    } catch {
+      // Update with fallback message
+      setMessages(prev => prev.map(m => 
+        m.id === connectingMessage.id 
+          ? { ...m, content: 'Оператор скоро ответит. Если долго нет ответа, напишите на info@netnext.org' }
+          : m
+      ))
     }
   }, [options, config, sessionId, messages])
 

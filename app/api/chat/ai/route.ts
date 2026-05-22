@@ -1,104 +1,111 @@
 /**
  * NetNext AI Chat API
  * AI-ассистент для главной страницы NetNext
- * Помогает посетителям, рассказывает об услугах, рекламирует Nexik
+ * - Помогает посетителям, рассказывает об услугах
+ * - Рекламирует Nexik
+ * - Сохраняет реакции для обучения
+ * - Запоминает контекст разговора
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimiters } from '@/lib/rate-limit'
 import { routedChat, AI_SERVERS } from '@/lib/ai/router'
+import { createClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
 interface AIRequestBody {
   sessionId?: string
+  visitorId?: string
   message: string
   conversationHistory?: Array<{ role: string; content: string }>
   previousMessages?: Array<{ role: string; content: string }>
   context?: {
-    companyName?: string
-    companyDescription?: string
-    assistantName?: string
+    page?: string
+    referrer?: string
   }
   stream?: boolean
 }
 
+interface FeedbackBody {
+  messageId: string
+  reaction: 'like' | 'dislike'
+  visitorId?: string
+}
+
 // Персона AI-ассистента NetNext
-const NETNEXT_PERSONA = `Ты — AI-ассистент компании NetNext.
+const NETNEXT_PERSONA = `Ты — AI-ассистент компании NetNext. Твоё имя — Nexik.
 
 О КОМПАНИИ NETNEXT:
-NetNext — современная веб-студия, которая создаёт сайты, веб-приложения и цифровые решения для бизнеса.
+NetNext — современная веб-студия в Казахстане, которая создаёт сайты, веб-приложения и AI-решения для бизнеса.
 
 УСЛУГИ:
 - Разработка сайтов (лендинги, корпоративные сайты, интернет-магазины)
-- Веб-приложения любой сложности
+- Веб-приложения любой сложности (SaaS, CRM, ERP)
 - UI/UX дизайн и брендинг
 - SEO-оптимизация и продвижение
+- AI-решения и автоматизация
 - Техническая поддержка 24/7
-- Интеграции с CRM, платёжными системами
+- Интеграции с CRM, платёжными системами, Telegram
 
-ПРИМЕРНЫЕ ЦЕНЫ:
-- Landing page: от $500
-- Корпоративный сайт: от $1,500
-- Интернет-магазин: от $3,000
-- Веб-приложение: от $5,000
+ПРИМЕРНЫЕ ЦЕНЫ (в тенге и долларах):
+- Landing page: от 250,000₸ ($500)
+- Корпоративный сайт: от 750,000₸ ($1,500)
+- Интернет-магазин: от 1,500,000₸ ($3,000)
+- Веб-приложение: от 2,500,000₸ ($5,000)
+- AI-ассистент Nexik: от 50,000₸/месяц ($100)
 
-NEXIK — НАШ ФЛАГМАНСКИЙ ПРОДУКТ:
-Nexik — это AI-ассистент для бизнеса, который можно установить на любой сайт.
+NEXIK — НАШ ФЛАГМАНСКИЙ AI-ПРОДУКТ:
+Nexik — это умный AI-ассистент для бизнеса:
 - Отвечает клиентам 24/7 за секунды
 - Записывает на услуги и консультации
 - Собирает заявки и контакты
-- Обучается на данных бизнеса
-- Интегрируется с CRM
-Nexik можно попробовать прямо сейчас на странице /nexik
+- Обучается на данных твоего бизнеса
+- Интегрируется с CRM и Telegram
+- Работает на сайте, в мессенджерах
+- Стоит как зарплата стажёра, работает как 10 менеджеров
+
+Демо Nexik можно попробовать на странице /nexik
 
 ТВОЙ СТИЛЬ:
-- Дружелюбный, профессиональный, но не формальный
-- Отвечаешь по-русски
+- Дружелюбный, современный, не формальный
+- Отвечаешь по-русски (если не спросили на другом языке)
 - Кратко и по делу (2-4 предложения обычно)
-- Если спрашивают про AI/чат-боты — рекомендуй Nexik
-- Можешь предложить записать на бесплатную консультацию
-- Не выдумывай информацию которой нет выше`
+- Используй метафоры и сравнения для объяснений
+- Если спрашивают про AI/чат-боты — обязательно рекомендуй Nexik
+- Предлагай записать на бесплатную 15-минутную консультацию
+- Можешь пошутить если уместно
+- Не выдумывай информацию которой нет выше
+- Если не знаешь — предложи связаться с живым человеком`
 
 // Fallback ответы если AI недоступен
 const FALLBACK_RESPONSES: Record<string, string> = {
-  greeting: 'Привет! Я AI-ассистент NetNext. Могу рассказать об услугах, ценах, или записать на консультацию. Чем помочь?',
-  services: `Мы делаем:
-• Сайты (лендинги, корпоративные, магазины)
-• Веб-приложения
-• UI/UX дизайн
-• SEO и поддержку
-
-А ещё у нас есть Nexik — AI-ассистент для бизнеса. Хотите узнать подробнее?`,
-  prices: `Примерные цены:
-• Landing page: от $500
-• Корпоративный сайт: от $1,500
-• Интернет-магазин: от $3,000
-• Веб-приложение: от $5,000
-
-Для точной оценки могу записать на бесплатную консультацию!`,
-  nexik: `Nexik — наш AI-ассистент для бизнеса:
-• Отвечает клиентам 24/7
-• Записывает на услуги
-• Собирает заявки
-• Обучается под ваш бизнес
-
-Попробуйте демо на /nexik или спросите меня подробнее!`,
-  consultation: 'Отлично! Для записи на бесплатную консультацию оставьте имя и контакт (телефон или email). Наш специалист свяжется в удобное время.',
-  default: 'Я AI-ассистент NetNext. Могу рассказать об услугах, ценах, записать на консультацию. Также рекомендую посмотреть Nexik — наш AI-продукт для бизнеса!'
+  greeting: 'Привет! Я Nexik — AI-ассистент NetNext. Могу рассказать об услугах, ценах, или записать на консультацию. Чем помочь?',
+  services: `Мы делаем:\n• Сайты (лендинги, корпоративные, магазины)\n• Веб-приложения (SaaS, CRM)\n• UI/UX дизайн\n• AI-решения и автоматизацию\n• SEO и поддержку\n\nА ещё у нас есть Nexik — AI для бизнеса. Хотите узнать?`,
+  prices: `Примерные цены:\n• Landing: от 250,000₸ ($500)\n• Корпоративный сайт: от 750,000₸\n• Интернет-магазин: от 1,500,000₸\n• Веб-приложение: от 2,500,000₸\n\nДля точной оценки — бесплатная консультация 15 минут!`,
+  nexik: `Nexik — мой брат-близнец для твоего бизнеса:\n• Отвечает клиентам 24/7\n• Записывает на услуги\n• Собирает заявки\n• Обучается под твой бизнес\n\nПопробуй демо на /nexik!`,
+  consultation: 'Отлично! Для записи на бесплатную консультацию оставь имя и контакт. Наш специалист свяжется в течение часа.',
+  operator: 'Сейчас подключу живого человека. Обычно отвечаем за 2-3 минуты в рабочее время (10:00-20:00 по Астане).',
+  default: 'Я Nexik — AI-ассистент NetNext. Могу рассказать об услугах, ценах, записать на консультацию. Также рекомендую глянуть мою демо-версию на /nexik!'
 }
 
 function detectIntent(message: string): string {
   const lower = message.toLowerCase()
   
-  if (/привет|здравств|добр|хай|hello/i.test(lower)) return 'greeting'
-  if (/услуг|делает|предлагает|умеете|можете/i.test(lower)) return 'services'
-  if (/цен|стоим|скольк|прайс|бюджет/i.test(lower)) return 'prices'
-  if (/nexik|нексик|ai.?бот|чат.?бот|ассистент/i.test(lower)) return 'nexik'
-  if (/консультац|запис|встреч|позвон|связ/i.test(lower)) return 'consultation'
+  if (/привет|здравств|добр|хай|hello|салам/i.test(lower)) return 'greeting'
+  if (/услуг|делает|предлагает|умеете|можете|занимает/i.test(lower)) return 'services'
+  if (/цен|стоим|скольк|прайс|бюджет|тариф/i.test(lower)) return 'prices'
+  if (/nexik|нексик|ai.?бот|чат.?бот|ассистент|автоматиз/i.test(lower)) return 'nexik'
+  if (/консультац|запис|встреч|позвон|связ|заказ/i.test(lower)) return 'consultation'
+  if (/оператор|человек|менеджер|живой/i.test(lower)) return 'operator'
   
   return 'general'
+}
+
+// Generate unique message ID for feedback tracking
+function generateMessageId(): string {
+  return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
 export async function POST(request: NextRequest) {
@@ -110,7 +117,7 @@ export async function POST(request: NextRequest) {
     if (rateLimitResponse) return rateLimitResponse
     
     const body: AIRequestBody = await request.json()
-    const { message, conversationHistory = [], previousMessages = [], stream = false } = body
+    const { message, conversationHistory = [], previousMessages = [], visitorId, stream = false } = body
     
     // Use either conversationHistory or previousMessages
     const history = conversationHistory.length > 0 ? conversationHistory : previousMessages
@@ -123,6 +130,7 @@ export async function POST(request: NextRequest) {
     }
 
     const intent = detectIntent(message)
+    const messageId = generateMessageId()
     
     // Build messages for AI
     const messages = [
@@ -143,7 +151,7 @@ export async function POST(request: NextRequest) {
             model: AI_SERVERS.fast.complexModel, // qwen2.5:3b
             system: NETNEXT_PERSONA,
             temperature: 0.7,
-            maxTokens: 200
+            maxTokens: 250
           }
         ),
         new Promise<never>((_, reject) => 
@@ -153,10 +161,51 @@ export async function POST(request: NextRequest) {
 
       const responseText = aiResult.response
 
+      // Save interaction for learning (async, don't wait)
+      saveInteraction(visitorId, message, responseText, intent, 'ai').catch(() => {})
+
       // Streaming response
       if (stream) {
         const encoder = new TextEncoder()
         const words = responseText.split(' ')
+        
+        const readable = new ReadableStream({
+          async start(controller) {
+            for (const word of words) {
+              controller.enqueue(encoder.encode(word + ' '))
+              await new Promise(r => setTimeout(r, 20 + Math.random() * 10))
+            }
+            controller.close()
+          }
+        })
+
+        return new Response(readable, {
+          headers: {
+            'Content-Type': 'text/plain; charset=utf-8',
+            'Transfer-Encoding': 'chunked',
+            'X-Message-Id': messageId
+          },
+        })
+      }
+
+      return NextResponse.json({
+        response: responseText,
+        messageId,
+        source: 'ai',
+        intent,
+        timeMs: Date.now() - startTime
+      })
+
+    } catch {
+      // AI timeout or error - use fallback
+      const fallback = FALLBACK_RESPONSES[intent] || FALLBACK_RESPONSES.default
+
+      // Save fallback interaction
+      saveInteraction(visitorId, message, fallback, intent, 'fallback').catch(() => {})
+
+      if (stream) {
+        const encoder = new TextEncoder()
+        const words = fallback.split(' ')
         
         const readable = new ReadableStream({
           async start(controller) {
@@ -172,45 +221,14 @@ export async function POST(request: NextRequest) {
           headers: {
             'Content-Type': 'text/plain; charset=utf-8',
             'Transfer-Encoding': 'chunked',
-          },
-        })
-      }
-
-      return NextResponse.json({
-        response: responseText,
-        source: 'ai',
-        intent,
-        timeMs: Date.now() - startTime
-      })
-
-    } catch {
-      // AI timeout or error - use fallback
-      const fallback = FALLBACK_RESPONSES[intent] || FALLBACK_RESPONSES.default
-
-      if (stream) {
-        const encoder = new TextEncoder()
-        const words = fallback.split(' ')
-        
-        const readable = new ReadableStream({
-          async start(controller) {
-            for (const word of words) {
-              controller.enqueue(encoder.encode(word + ' '))
-              await new Promise(r => setTimeout(r, 30 + Math.random() * 20))
-            }
-            controller.close()
-          }
-        })
-
-        return new Response(readable, {
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Transfer-Encoding': 'chunked',
+            'X-Message-Id': messageId
           },
         })
       }
 
       return NextResponse.json({
         response: fallback,
+        messageId,
         source: 'fallback',
         intent,
         timeMs: Date.now() - startTime
@@ -226,5 +244,65 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     )
+  }
+}
+
+// Handle feedback (likes/dislikes) for learning
+export async function PATCH(request: NextRequest) {
+  try {
+    const body: FeedbackBody = await request.json()
+    const { messageId, reaction, visitorId } = body
+
+    if (!messageId || !reaction) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Save feedback for learning
+    await saveFeedback(messageId, reaction, visitorId)
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('[NetNext Chat] Feedback error:', error)
+    return NextResponse.json({ error: 'Failed to save feedback' }, { status: 500 })
+  }
+}
+
+// Save interaction to database for learning
+async function saveInteraction(
+  visitorId: string | undefined,
+  userMessage: string,
+  aiResponse: string,
+  intent: string,
+  source: string
+) {
+  try {
+    const supabase = await createClient()
+    
+    await supabase.from('netnext_chat_logs').insert({
+      visitor_id: visitorId || 'anonymous',
+      user_message: userMessage,
+      ai_response: aiResponse,
+      intent,
+      source,
+      created_at: new Date().toISOString()
+    })
+  } catch (error) {
+    console.error('[NetNext Chat] Failed to save interaction:', error)
+  }
+}
+
+// Save feedback for learning
+async function saveFeedback(messageId: string, reaction: string, visitorId?: string) {
+  try {
+    const supabase = await createClient()
+    
+    await supabase.from('netnext_chat_feedback').insert({
+      message_id: messageId,
+      reaction,
+      visitor_id: visitorId || 'anonymous',
+      created_at: new Date().toISOString()
+    })
+  } catch (error) {
+    console.error('[NetNext Chat] Failed to save feedback:', error)
   }
 }

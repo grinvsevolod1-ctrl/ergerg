@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useRef, useCallback, KeyboardEvent } from 'react'
-import { Send, Paperclip, Smile, Mic, MicOff, X } from 'lucide-react'
+import { useState, useRef, useCallback, KeyboardEvent, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Send, Paperclip, Mic, MicOff, X, Sparkles, ArrowUpRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ChatConfig } from './types'
 
@@ -13,31 +14,101 @@ interface ChatInputProps {
   className?: string
 }
 
-const QUICK_EMOJIS: string[] = []
+// Smart suggestions based on context
+const SMART_SUGGESTIONS = [
+  { text: 'Сколько стоит разработка сайта?', category: 'price' },
+  { text: 'Расскажи про Nexik', category: 'product' },
+  { text: 'Как работают AI-ассистенты?', category: 'tech' },
+  { text: 'Хочу записаться на консультацию', category: 'action' },
+  { text: 'Какие у вас сроки разработки?', category: 'info' },
+]
 
 export function ChatInput({ config, onSend, onAttach, disabled, className }: ChatInputProps) {
   const [value, setValue] = useState('')
   const [isFocused, setIsFocused] = useState(false)
-  const [showEmojis, setShowEmojis] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [filteredSuggestions, setFilteredSuggestions] = useState(SMART_SUGGESTIONS)
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Filter suggestions based on input
+  useEffect(() => {
+    if (value.trim().length > 0 && value.trim().length < 30) {
+      const lower = value.toLowerCase()
+      const filtered = SMART_SUGGESTIONS.filter(s => 
+        s.text.toLowerCase().includes(lower) ||
+        (lower.includes('цен') && s.category === 'price') ||
+        (lower.includes('стои') && s.category === 'price') ||
+        (lower.includes('nexik') && s.category === 'product') ||
+        (lower.includes('нексик') && s.category === 'product') ||
+        (lower.includes('ai') && s.category === 'tech') ||
+        (lower.includes('ии') && s.category === 'tech') ||
+        (lower.includes('консульт') && s.category === 'action') ||
+        (lower.includes('срок') && s.category === 'info')
+      )
+      setFilteredSuggestions(filtered.slice(0, 3))
+      setShowSuggestions(filtered.length > 0 && isFocused)
+    } else {
+      setShowSuggestions(false)
+    }
+    setSelectedSuggestionIndex(-1)
+  }, [value, isFocused])
 
   const handleSend = useCallback(() => {
     if (!value.trim() || disabled) return
     onSend(value.trim())
     setValue('')
-    setShowEmojis(false)
+    setShowSuggestions(false)
     
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
   }, [value, disabled, onSend])
 
+  const handleSuggestionClick = useCallback((text: string) => {
+    onSend(text)
+    setValue('')
+    setShowSuggestions(false)
+  }, [onSend])
+
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle suggestion navigation
+    if (showSuggestions && filteredSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSelectedSuggestionIndex(prev => 
+          prev < filteredSuggestions.length - 1 ? prev + 1 : 0
+        )
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSelectedSuggestionIndex(prev => 
+          prev > 0 ? prev - 1 : filteredSuggestions.length - 1
+        )
+        return
+      }
+      if (e.key === 'Tab' && selectedSuggestionIndex >= 0) {
+        e.preventDefault()
+        handleSuggestionClick(filteredSuggestions[selectedSuggestionIndex].text)
+        return
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSend()
+      if (selectedSuggestionIndex >= 0 && showSuggestions) {
+        handleSuggestionClick(filteredSuggestions[selectedSuggestionIndex].text)
+      } else {
+        handleSend()
+      }
+    }
+    
+    if (e.key === 'Escape') {
+      setShowSuggestions(false)
+      setSelectedSuggestionIndex(-1)
     }
   }
 
@@ -47,11 +118,6 @@ export function ChatInput({ config, onSend, onAttach, disabled, className }: Cha
       textarea.style.height = 'auto'
       textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
     }
-  }
-
-  const handleEmojiClick = (emoji: string) => {
-    setValue(prev => prev + emoji)
-    textareaRef.current?.focus()
   }
 
   const handleAttachClick = () => {
@@ -72,9 +138,7 @@ export function ChatInput({ config, onSend, onAttach, disabled, className }: Cha
       return
     }
 
-    // Check for browser support
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      console.warn('[v0] Speech recognition not supported')
       return
     }
 
@@ -102,28 +166,50 @@ export function ChatInput({ config, onSend, onAttach, disabled, className }: Cha
 
   return (
     <div className={cn("relative px-4 pb-4 pt-2", className)} style={{ backgroundColor: 'rgb(24, 24, 27)' }}>
-      {/* Quick emoji bar */}
-      {showEmojis && (
-        <div className="absolute bottom-full left-4 right-4 mb-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
-          <div className="flex items-center gap-1 p-2 rounded-xl bg-zinc-800 border border-zinc-700 shadow-xl">
-            {QUICK_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() => handleEmojiClick(emoji)}
-                className="p-2 rounded-lg hover:bg-zinc-700 active:scale-95 transition-all text-lg"
-              >
-                {emoji}
-              </button>
-            ))}
-            <button
-              onClick={() => setShowEmojis(false)}
-              className="ml-auto p-2 rounded-lg hover:bg-zinc-700 text-zinc-400"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Smart suggestions dropdown */}
+      <AnimatePresence>
+        {showSuggestions && filteredSuggestions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            className="absolute bottom-full left-4 right-4 mb-2 z-10"
+          >
+            <div className="rounded-xl bg-zinc-800/95 backdrop-blur-sm border border-zinc-700 shadow-xl overflow-hidden">
+              <div className="px-3 py-2 border-b border-zinc-700/50 flex items-center gap-2">
+                <Sparkles className="w-3 h-3 text-teal-400" />
+                <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Подсказки</span>
+              </div>
+              {filteredSuggestions.map((suggestion, index) => (
+                <motion.button
+                  key={suggestion.text}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  onClick={() => handleSuggestionClick(suggestion.text)}
+                  className={cn(
+                    "w-full px-3 py-2.5 text-left text-sm text-zinc-300 transition-all",
+                    "hover:bg-zinc-700/50 flex items-center justify-between gap-2",
+                    selectedSuggestionIndex === index && "bg-teal-500/10 text-teal-300"
+                  )}
+                >
+                  <span className="truncate">{suggestion.text}</span>
+                  <ArrowUpRight className={cn(
+                    "w-3 h-3 flex-shrink-0 transition-colors",
+                    selectedSuggestionIndex === index ? "text-teal-400" : "text-zinc-600"
+                  )} />
+                </motion.button>
+              ))}
+              <div className="px-3 py-1.5 border-t border-zinc-700/50">
+                <p className="text-[9px] text-zinc-600">
+                  <kbd className="px-1 py-0.5 rounded bg-zinc-700 text-zinc-400 font-mono">Tab</kbd> выбрать, 
+                  <kbd className="px-1 py-0.5 rounded bg-zinc-700 text-zinc-400 font-mono ml-1">Esc</kbd> закрыть
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Hidden file input */}
       <input
@@ -142,16 +228,21 @@ export function ChatInput({ config, onSend, onAttach, disabled, className }: Cha
         )}
       >
         {/* Animated gradient border when focused */}
-        {isFocused && (
-          <div 
-            className="absolute -inset-[1px] rounded-2xl opacity-75"
-            style={{
-              background: 'linear-gradient(90deg, rgba(79,209,197,0.5), rgba(56,178,172,1), rgba(79,209,197,0.5))',
-              backgroundSize: '200% 100%',
-              animation: 'gradient-shift 2s ease infinite',
-            }}
-          />
-        )}
+        <AnimatePresence>
+          {isFocused && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.75 }}
+              exit={{ opacity: 0 }}
+              className="absolute -inset-[1px] rounded-2xl"
+              style={{
+                background: 'linear-gradient(90deg, rgba(79,209,197,0.5), rgba(56,178,172,1), rgba(79,209,197,0.5))',
+                backgroundSize: '200% 100%',
+                animation: 'gradient-shift 2s ease infinite',
+              }}
+            />
+          )}
+        </AnimatePresence>
         
         {/* Inner container */}
         <div className={cn(
@@ -161,21 +252,23 @@ export function ChatInput({ config, onSend, onAttach, disabled, className }: Cha
           isFocused ? "border-transparent" : "border-zinc-700"
         )}>
           {/* Attachment button */}
-          <button
+          <motion.button
             type="button"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={handleAttachClick}
             className={cn(
               "flex-shrink-0 p-2 rounded-xl",
               "text-zinc-400 hover:text-teal-400",
-              "hover:bg-zinc-700 active:bg-zinc-600 active:scale-95",
-              "transition-all duration-200",
+              "hover:bg-zinc-700 active:bg-zinc-600",
+              "transition-colors duration-200",
               "disabled:opacity-40 disabled:pointer-events-none"
             )}
             disabled={disabled}
             title="Прикрепить файл"
           >
             <Paperclip className="w-5 h-5" />
-          </button>
+          </motion.button>
 
           {/* Text input */}
           <div className="flex-1 relative">
@@ -186,7 +279,11 @@ export function ChatInput({ config, onSend, onAttach, disabled, className }: Cha
               onKeyDown={handleKeyDown}
               onInput={handleInput}
               onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
+              onBlur={() => {
+                setIsFocused(false)
+                // Delay hiding suggestions to allow click
+                setTimeout(() => setShowSuggestions(false), 200)
+              }}
               placeholder={config.placeholder || 'Напишите сообщение...'}
               disabled={disabled}
               rows={1}
@@ -199,57 +296,48 @@ export function ChatInput({ config, onSend, onAttach, disabled, className }: Cha
             />
           </div>
 
-          {/* Emoji button */}
-          <button
-            type="button"
-            onClick={() => setShowEmojis(!showEmojis)}
-            className={cn(
-              "flex-shrink-0 p-2 rounded-xl",
-              "transition-all duration-200",
-              "disabled:opacity-40 disabled:pointer-events-none",
-              showEmojis 
-                ? "text-teal-400 bg-teal-400/10" 
-                : "text-zinc-400 hover:text-teal-400 hover:bg-zinc-700 active:bg-zinc-600"
-            )}
-            disabled={disabled}
-            title="Эмодзи"
-          >
-            <Smile className="w-5 h-5" />
-          </button>
-
           {/* Voice button */}
-          <button
+          <motion.button
             type="button"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
             onClick={toggleRecording}
             className={cn(
               "flex-shrink-0 p-2 rounded-xl",
-              "transition-all duration-200",
+              "transition-colors duration-200",
               "disabled:opacity-40 disabled:pointer-events-none",
               isRecording 
-                ? "text-red-400 bg-red-400/10 animate-pulse" 
-                : "text-zinc-400 hover:text-teal-400 hover:bg-zinc-700 active:bg-zinc-600"
+                ? "text-red-400 bg-red-400/10" 
+                : "text-zinc-400 hover:text-teal-400 hover:bg-zinc-700"
             )}
             disabled={disabled}
             title={isRecording ? "Остановить запись" : "Голосовое сообщение"}
           >
-            {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-          </button>
+            {isRecording ? (
+              <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
+                <MicOff className="w-5 h-5" />
+              </motion.div>
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
+          </motion.button>
 
           {/* Send button */}
-          <button
+          <motion.button
             type="button"
+            whileHover={hasContent && !disabled ? { scale: 1.1 } : {}}
+            whileTap={hasContent && !disabled ? { scale: 0.9 } : {}}
             onClick={handleSend}
             disabled={!hasContent || disabled}
             className={cn(
               "flex-shrink-0 p-2.5 rounded-xl",
               "transition-all duration-300",
-              "disabled:opacity-30 disabled:cursor-not-allowed disabled:scale-95",
+              "disabled:opacity-30 disabled:cursor-not-allowed",
               hasContent ? [
                 "bg-gradient-to-r from-teal-500 to-teal-600",
                 "text-white",
                 "shadow-lg shadow-teal-500/25",
-                "hover:shadow-xl hover:shadow-teal-500/40 hover:from-teal-400 hover:to-teal-500",
-                "hover:scale-105 active:scale-95",
+                "hover:shadow-xl hover:shadow-teal-500/40",
               ] : [
                 "bg-zinc-700",
                 "text-zinc-500",
@@ -261,16 +349,24 @@ export function ChatInput({ config, onSend, onAttach, disabled, className }: Cha
               "w-5 h-5 transition-transform duration-300",
               hasContent && "-rotate-45"
             )} />
-          </button>
+          </motion.button>
         </div>
       </div>
 
       {/* Hint */}
-      <div className="flex items-center justify-center gap-2 mt-3">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        className="flex items-center justify-center gap-2 mt-3"
+      >
         <p className="text-[10px] text-zinc-500">
-          <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono text-[9px]">Enter</kbd> отправить, <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono text-[9px]">Shift+Enter</kbd> новая строка
+          <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 font-mono text-[9px]">Enter</kbd>
+          <span className="mx-1">отправить</span>
+          <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 font-mono text-[9px]">Shift+Enter</kbd>
+          <span className="ml-1">новая строка</span>
         </p>
-      </div>
+      </motion.div>
 
       {/* Gradient animation keyframes */}
       <style jsx>{`
