@@ -20,7 +20,7 @@ export function ChatHeader({ operatorConnected, onClose }: ChatHeaderProps) {
             <div className={cn(
               "w-10 h-10 rounded-full flex items-center justify-center",
               operatorConnected
-                ? "bg-gradient-to-br from-green-500 to-emerald-600"
+                ? "bg-gradient-to-br from-blue-500 to-blue-600"
                 : "bg-gradient-to-br from-primary to-accent"
             )}>
               {operatorConnected ? (
@@ -29,14 +29,13 @@ export function ChatHeader({ operatorConnected, onClose }: ChatHeaderProps) {
                 <NNAssistantIcon className="w-5 h-5 text-primary-foreground" />
               )}
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-card" />
           </div>
           <div>
             <p className="font-semibold text-sm text-foreground leading-tight">
               {operatorConnected ? "Оператор" : "NetNext"}
             </p>
             <p className="text-[11px] text-muted-foreground leading-tight">
-              {operatorConnected ? "Отвечает живой человек" : "Онлайн • Отвечаем быстро"}
+              {operatorConnected ? "Отвечает живой человек" : "AI-ассистент"}
             </p>
           </div>
         </div>

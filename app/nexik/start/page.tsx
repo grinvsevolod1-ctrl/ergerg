@@ -4,12 +4,24 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Send, ArrowRight, Check, Loader2, Globe, Copy, X, Sparkles, MessageCircle, ExternalLink, Lock } from "lucide-react"
+import { Send, ArrowRight, Check, Loader2, Globe, Copy, X, Sparkles, MessageCircle, ExternalLink, Lock, Mic, MicOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SiriOrb } from "@/components/nexik/siri-orb"
 import { SiriOrb as NetNextSiriOrb } from "@/components/ai-orb"
 
-type Step = "chat" | "website" | "offer" | "netnext-chat" | "register" | "done"
+type Step = "chat" | "platforms" | "offer" | "netnext-chat" | "register" | "done"
+
+// Платформы для интеграции
+const PLATFORMS = [
+  { id: "telegram", name: "Telegram", icon: "https://upload.wikimedia.org/wikipedia/commons/8/82/Telegram_logo.svg" },
+  { id: "whatsapp", name: "WhatsApp", icon: "https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" },
+  { id: "viber", name: "Viber", icon: "https://upload.wikimedia.org/wikipedia/commons/d/df/Viber_logo.svg" },
+  { id: "vk", name: "ВКонтакте", icon: "https://upload.wikimedia.org/wikipedia/commons/2/21/VK.com-logo.svg" },
+  { id: "wechat", name: "WeChat", icon: "https://upload.wikimedia.org/wikipedia/commons/a/a5/WeChat_logo.svg" },
+  { id: "instagram", name: "Instagram", icon: "https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg" },
+  { id: "facebook", name: "Facebook", icon: "https://upload.wikimedia.org/wikipedia/commons/0/05/Facebook_Logo_%282019%29.png" },
+  { id: "website", name: "Собственный сайт", icon: null },
+]
 
 interface Message {
   id: string
@@ -38,6 +50,52 @@ function getResponse(input: string): string {
   return businessResponses.default
 }
 
+// Проверка на бессмысленный ввод
+function isGibberish(input: string): boolean {
+  const lower = input.toLowerCase().trim()
+  
+  // Слишком короткий текст (меньше 3 слов)
+  const words = lower.split(/\s+/).filter(w => w.length > 1)
+  if (words.length < 2) return true
+  
+  // Повторяющиеся символы
+  if (/(.)\1{4,}/.test(lower)) return true
+  
+  // Только цифры или спец символы
+  if (/^[\d\s\W]+$/.test(lower)) return true
+  
+  // Бессмысленные наборы букв (нет гласных или только согласные)
+  const russianVowels = /[аеёиоуыэюя]/
+  const englishVowels = /[aeiou]/
+  const hasRussianLetters = /[а-яё]/.test(lower)
+  const hasEnglishLetters = /[a-z]/.test(lower)
+  
+  if (hasRussianLetters && !russianVowels.test(lower)) return true
+  if (hasEnglishLetters && !hasRussianLetters && !englishVowels.test(lower)) return true
+  
+  // Слова из списка бессмысленных
+  const gibberishWords = [
+    'asdf', 'qwerty', 'йцукен', 'фыва', 'test', 'тест', 'ааа', 'ввв',
+    'хз', 'пофиг', 'лол', 'кек', 'хаха', 'ыыы', 'эээ', '...', '???',
+    'ничего', 'незнаю', 'не знаю', 'потом', 'хуй', 'пизд', 'бля', 'нах'
+  ]
+  
+  for (const word of gibberishWords) {
+    if (lower.includes(word)) return true
+  }
+  
+  return false
+}
+
+// Ответы на бессмысленный ввод
+const gibberishResponses = [
+  "Хм, не совсем понял. Расскажи конкретнее - чем занимается твой бизнес? Например: 'У меня автосервис' или 'Продаю косметику онлайн'",
+  "Давай попробуем ещё раз. Просто опиши свой бизнес в 2-3 словах. Что ты продаёшь или какие услуги оказываешь?",
+  "Мне нужно понять твою нишу, чтобы помочь. Напиши, например: 'кофейня', 'юридические услуги', 'интернет-магазин одежды'"
+]
+
+let gibberishCount = 0
+
 export default function NexikStartPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>("chat")
@@ -58,6 +116,14 @@ export default function NexikStartPage() {
   const [businessDesc, setBusinessDesc] = useState("")
   const [userName, setUserName] = useState("")
   const [userPhone, setUserPhone] = useState("")
+  
+  // Platforms selection
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  
+  // Voice input state
+  const [isListening, setIsListening] = useState(false)
+  const [voiceSupported, setVoiceSupported] = useState(false)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
   
   // NetNext chat state
   const [netnextMessages, setNetnextMessages] = useState<Message[]>([])
@@ -90,15 +156,55 @@ export default function NexikStartPage() {
     inputRef.current?.focus()
   }, [step])
 
+  // Check voice support
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    setVoiceSupported(!!SpeechRecognition)
+    
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition()
+      recognition.lang = 'ru-RU'
+      recognition.continuous = false
+      recognition.interimResults = false
+      
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = event.results[0][0].transcript
+        setInput(transcript)
+        setIsListening(false)
+      }
+      
+      recognition.onerror = () => {
+        setIsListening(false)
+      }
+      
+      recognition.onend = () => {
+        setIsListening(false)
+      }
+      
+      recognitionRef.current = recognition
+    }
+  }, [])
+
+  const toggleVoice = useCallback(() => {
+    if (!recognitionRef.current) return
+    
+    if (isListening) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    } else {
+      recognitionRef.current.start()
+      setIsListening(true)
+    }
+  }, [isListening])
+
   const sendMessage = useCallback(() => {
     if (!input.trim() || isTyping || isThinking) return
 
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: input }
     setMessages(prev => [...prev, userMsg])
-    setBusinessDesc(input)
     setInput("")
     
-    // Показываем "думает" на 1.5-2.5 секунды
+    // Показываем "думает"
     setIsThinking(true)
     
     const thinkingTime = 1500 + Math.random() * 1000
@@ -106,35 +212,62 @@ export default function NexikStartPage() {
       setIsThinking(false)
       setIsTyping(true)
       
-      // Затем печатает ответ
       setTimeout(() => {
+        // Проверяем на бессмысленный ввод
+        if (isGibberish(userMsg.content)) {
+          gibberishCount++
+          
+          let response = gibberishResponses[Math.min(gibberishCount - 1, gibberishResponses.length - 1)]
+          
+          // После 2 попыток предлагаем микрофон
+          if (gibberishCount >= 2 && voiceSupported) {
+            response += "\n\nИли если не хочешь печатать - нажми на микрофон и просто расскажи голосом!"
+          }
+          
+          setMessages(prev => [...prev, {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: response
+          }])
+          setIsTyping(false)
+          return
+        }
+        
+        // Сбрасываем счётчик при нормальном вводе
+        gibberishCount = 0
+        setBusinessDesc(userMsg.content)
+        
         const response = getResponse(userMsg.content)
         setMessages(prev => [...prev, {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: response + "\n\nУ тебя есть сайт? (можешь пропустить)"
+          content: response
         }])
         setIsTyping(false)
-        setStep("website")
+        
+        // Переходим к выбору платформ через небольшую паузу
+        setTimeout(() => {
+          setStep("platforms")
+        }, 1500)
       }, 800)
     }, thinkingTime)
-  }, [input, isTyping, isThinking])
+  }, [input, isTyping, isThinking, voiceSupported])
 
-  const handleWebsiteSubmit = useCallback(async () => {
-    if (!websiteUrl.trim()) {
-      setStep("offer")
-      return
-    }
-
-    setIsAnalyzing(true)
-    await new Promise(r => setTimeout(r, 1500))
-    setIsAnalyzing(false)
-    setStep("register")
-  }, [websiteUrl])
-
-  const skipWebsite = useCallback(() => {
-    setStep("offer")
+  // Выбор платформы
+  const togglePlatform = useCallback((platformId: string) => {
+    setSelectedPlatforms(prev => 
+      prev.includes(platformId) 
+        ? prev.filter(p => p !== platformId)
+        : [...prev, platformId]
+    )
   }, [])
+
+  const handlePlatformsSubmit = useCallback(() => {
+    if (selectedPlatforms.length === 0) {
+      // Если ничего не выбрано, всё равно продолжаем
+    }
+    setStep("offer")
+  }, [selectedPlatforms])
 
   // Открыть чат с NetNext AI
   const openNetnextChat = useCallback(() => {
@@ -425,55 +558,132 @@ export default function NexikStartPage() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                   placeholder="Например: у меня автосервис..."
-                  disabled={isTyping || isThinking}
-                  className="w-full px-4 sm:px-5 py-3.5 sm:py-4 pr-14 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-sm sm:text-base text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
+                  disabled={isTyping || isThinking || isListening}
+                  className={cn(
+                    "w-full px-4 sm:px-5 py-3.5 sm:py-4 pr-28 bg-white/5 border rounded-xl sm:rounded-2xl text-sm sm:text-base text-white placeholder-zinc-500 focus:outline-none transition-colors disabled:opacity-50",
+                    isListening ? "border-cyan-500 bg-cyan-500/5" : "border-white/10 focus:border-cyan-500/50"
+                  )}
                 />
-                <button
-                  onClick={sendMessage}
-                  disabled={!input.trim() || isTyping || isThinking}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-cyan-500 text-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-cyan-400 transition-colors"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  {voiceSupported && (
+                    <button
+                      onClick={toggleVoice}
+                      disabled={isTyping || isThinking}
+                      className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center transition-all",
+                        isListening 
+                          ? "bg-red-500 text-white animate-pulse" 
+                          : "bg-white/10 text-zinc-400 hover:bg-white/20 hover:text-white"
+                      )}
+                      title={isListening ? "Остановить запись" : "Голосовой ввод"}
+                    >
+                      {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    </button>
+                  )}
+                  <button
+                    onClick={sendMessage}
+                    disabled={!input.trim() || isTyping || isThinking}
+                    className="w-10 h-10 rounded-xl bg-cyan-500 text-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-cyan-400 transition-colors"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
+              {isListening && (
+                <motion.p 
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center text-sm text-cyan-400 mt-3"
+                >
+                  Слушаю... Расскажи о своём бизнесе
+                </motion.p>
+              )}
             </motion.div>
           )}
 
-          {step === "website" && (
+          {step === "platforms" && (
             <motion.div
-              key="website"
+              key="platforms"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               className="flex-1 flex flex-col items-center justify-center text-center"
             >
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center mb-6">
-                <Globe className="w-8 h-8 text-black" />
-              </div>
-              <h2 className="text-2xl font-bold mb-2">Есть сайт?</h2>
-              <p className="text-zinc-400 mb-8 max-w-sm">Я проанализирую его и сразу пойму специфику твоего бизнеса</p>
-              <div className="w-full max-w-md space-y-4">
-                <div className="relative">
-                  <input
-                    ref={inputRef}
-                    type="url"
-                    value={websiteUrl}
-                    onChange={(e) => setWebsiteUrl(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleWebsiteSubmit()}
-                    placeholder="https://example.com"
-                    className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
-                  />
+              <motion.div 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="w-20 h-20 rounded-3xl bg-gradient-to-br from-cyan-400 via-teal-500 to-cyan-600 flex items-center justify-center mb-8 shadow-lg shadow-cyan-500/30"
+              >
+                <Sparkles className="w-10 h-10 text-black" />
+              </motion.div>
+              
+              <h2 className="text-2xl sm:text-3xl font-bold mb-3 bg-gradient-to-r from-white to-zinc-300 bg-clip-text text-transparent">
+                Где будете использовать Nexik?
+              </h2>
+              <p className="text-zinc-400 mb-8 max-w-md text-sm sm:text-base">
+                Выберите платформы, где хотите подключить AI-ассистента. Можно выбрать несколько
+              </p>
+              
+              <div className="w-full max-w-lg">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+                  {PLATFORMS.map((platform) => (
+                    <motion.button
+                      key={platform.id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => togglePlatform(platform.id)}
+                      className={cn(
+                        "relative flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all duration-200",
+                        selectedPlatforms.includes(platform.id)
+                          ? "bg-cyan-500/10 border-cyan-500/50 shadow-lg shadow-cyan-500/10"
+                          : "bg-white/5 border-white/10 hover:border-white/20"
+                      )}
+                    >
+                      {selectedPlatforms.includes(platform.id) && (
+                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center">
+                          <Check className="w-3 h-3 text-black" />
+                        </div>
+                      )}
+                      {platform.icon ? (
+                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden">
+                          <img 
+                            src={platform.icon} 
+                            alt={platform.name}
+                            className="w-6 h-6 object-contain"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                              e.currentTarget.parentElement!.innerHTML = '<span class="text-lg">' + platform.name[0] + '</span>'
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-teal-500/20 flex items-center justify-center">
+                          <Globe className="w-5 h-5 text-cyan-400" />
+                        </div>
+                      )}
+                      <span className="text-xs sm:text-sm font-medium text-zinc-300">{platform.name}</span>
+                    </motion.button>
+                  ))}
                 </div>
-                <button
-                  onClick={handleWebsiteSubmit}
-                  disabled={isAnalyzing}
-                  className="w-full py-4 bg-white text-black font-medium rounded-2xl hover:bg-zinc-100 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isAnalyzing ? <><Loader2 className="w-5 h-5 animate-spin" /> Анализирую...</> : <><ArrowRight className="w-5 h-5" /> Продолжить</>}
-                </button>
-                <button onClick={skipWebsite} className="w-full py-3 text-zinc-400 hover:text-white transition-colors text-sm">
-                  Пропустить, нет сайта
-                </button>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={handlePlatformsSubmit}
+                    className="w-full py-4 bg-gradient-to-r from-cyan-500 to-teal-500 text-black font-semibold rounded-2xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                  >
+                    <ArrowRight className="w-5 h-5" />
+                    {selectedPlatforms.length > 0 
+                      ? `Продолжить (${selectedPlatforms.length} ${selectedPlatforms.length === 1 ? 'платформа' : selectedPlatforms.length < 5 ? 'платформы' : 'платформ'})`
+                      : 'Продолжить'
+                    }
+                  </button>
+                  
+                  {selectedPlatforms.length === 0 && (
+                    <p className="text-xs text-zinc-500 text-center">
+                      Можно пропустить, если пока не определились
+                    </p>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}

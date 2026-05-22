@@ -280,11 +280,10 @@ function ChatDemo({ visible }: { visible: boolean }) {
         >
           <div className="relative">
             <SiriOrb size={48} state={isTyping ? "thinking" : "idle"} />
-            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-[#0a0f14] shadow-lg shadow-emerald-500/50" />
           </div>
           <div>
             <h3 className="font-semibold text-white text-lg">Nexik</h3>
-            <p className="text-sm text-emerald-400/80">Онлайн</p>
+            <p className="text-sm text-cyan-400/80">{isTyping ? "печатает..." : "AI-ассистент"}</p>
           </div>
         </div>
 

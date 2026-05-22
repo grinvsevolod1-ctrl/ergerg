@@ -85,20 +85,6 @@ export function ChatHeader({
             style={{ background: 'radial-gradient(circle, rgba(79,209,197,0.5) 0%, transparent 70%)' }}
           />
           <SiriOrb size={44} isHovered={isTyping} isActive={isTyping} />
-          
-          {/* Status indicator */}
-          <div 
-            className={cn(
-              "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full",
-              "ring-2 ring-zinc-800",
-              "transition-all duration-300",
-              isConnectedToOperator 
-                ? "bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.7)]" 
-                : isTyping
-                  ? "bg-teal-400 shadow-[0_0_10px_rgba(79,209,197,0.7)] animate-pulse"
-                  : "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]"
-            )}
-          />
         </div>
         
         <div className="flex flex-col">
@@ -122,7 +108,7 @@ export function ChatHeader({
                 ? 'печатает...' 
                 : isConnectedToOperator 
                   ? 'на связи' 
-                  : 'онлайн'
+                  : 'AI-ассистент'
               }
             </span>
             {isTyping && (
