@@ -591,6 +591,118 @@ export async function initNexikSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_nexik_custom_models_org ON nexik_custom_models(org_id, is_active);
     CREATE INDEX IF NOT EXISTS idx_nexik_training_jobs_model ON nexik_training_jobs(model_id, status);
     CREATE INDEX IF NOT EXISTS idx_nexik_ab_test_results_org ON nexik_ab_test_results(org_id, created_at);
+
+    -- =====================================================
+    -- MEMORY SYSTEM (v3) - Long-term visitor memory
+    -- =====================================================
+
+    CREATE TABLE IF NOT EXISTS nexik_visitor_memory (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      visitor_id VARCHAR(255) NOT NULL,
+      
+      -- Identity
+      name VARCHAR(255),
+      email VARCHAR(255),
+      phone VARCHAR(100),
+      avatar_url TEXT,
+      
+      -- Personality profile
+      communication_style VARCHAR(50),
+      preferred_language VARCHAR(10),
+      timezone VARCHAR(50),
+      response_speed_preference VARCHAR(50),
+      
+      -- Business context
+      company_name VARCHAR(255),
+      job_title VARCHAR(255),
+      industry VARCHAR(100),
+      company_size VARCHAR(50),
+      
+      -- Arrays (stored as JSONB)
+      interests JSONB DEFAULT '[]',
+      pain_points JSONB DEFAULT '[]',
+      goals JSONB DEFAULT '[]',
+      products_interested JSONB DEFAULT '[]',
+      products_purchased JSONB DEFAULT '[]',
+      
+      -- Purchase history
+      customer_since TIMESTAMP,
+      total_purchases INTEGER DEFAULT 0,
+      total_spent DECIMAL(12,2) DEFAULT 0,
+      last_purchase_at TIMESTAMP,
+      
+      -- Interaction stats
+      total_conversations INTEGER DEFAULT 0,
+      total_messages INTEGER DEFAULT 0,
+      avg_sentiment_score DECIMAL(4,2),
+      last_sentiment VARCHAR(20),
+      
+      -- AI-extracted data
+      facts JSONB DEFAULT '[]',
+      conversation_summaries JSONB DEFAULT '[]',
+      
+      -- Timestamps
+      first_seen_at TIMESTAMP DEFAULT NOW(),
+      last_seen_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      
+      UNIQUE(org_id, visitor_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_nexik_visitor_memory_org ON nexik_visitor_memory(org_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_visitor_memory_visitor ON nexik_visitor_memory(org_id, visitor_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_visitor_memory_last_seen ON nexik_visitor_memory(org_id, last_seen_at DESC);
+
+    -- =====================================================
+    -- PERSONALITY SYSTEM (v3) - Configurable AI personality
+    -- =====================================================
+
+    CREATE TABLE IF NOT EXISTS nexik_personalities (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      is_default BOOLEAN DEFAULT false,
+      
+      -- Core personality
+      persona_name VARCHAR(100),
+      persona_role VARCHAR(255),
+      persona_description TEXT,
+      
+      -- Communication style
+      formality VARCHAR(50) DEFAULT 'mixed',
+      humor_level VARCHAR(50) DEFAULT 'moderate',
+      emoji_usage VARCHAR(50) DEFAULT 'moderate',
+      response_length VARCHAR(50) DEFAULT 'balanced',
+      
+      -- Language settings
+      use_slang BOOLEAN DEFAULT true,
+      use_filler_words BOOLEAN DEFAULT true,
+      make_typos BOOLEAN DEFAULT false,
+      typo_frequency DECIMAL(3,2) DEFAULT 0,
+      
+      -- Behavior
+      ask_clarifying_questions BOOLEAN DEFAULT true,
+      admit_uncertainty BOOLEAN DEFAULT true,
+      show_empathy BOOLEAN DEFAULT true,
+      use_visitor_name BOOLEAN DEFAULT true,
+      
+      -- Response patterns
+      greeting_templates JSONB DEFAULT '[]',
+      farewell_templates JSONB DEFAULT '[]',
+      filler_phrases JSONB DEFAULT '[]',
+      thinking_phrases JSONB DEFAULT '[]',
+      
+      -- System prompt additions
+      custom_instructions TEXT,
+      forbidden_topics TEXT[],
+      required_disclaimers TEXT[],
+      
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_nexik_personalities_org ON nexik_personalities(org_id);
   `)
   // Database schema initialized
 }
