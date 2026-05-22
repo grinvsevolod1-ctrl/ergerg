@@ -1,58 +1,57 @@
 /**
- * Model Warmup API
- * Keeps models loaded in Ollama memory for faster responses
+ * Model Warmup API - Dual Server Support
+ * Keeps models loaded on both FAST and QUALITY servers
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getOllamaBaseUrl } from '@/lib/ai/providers'
-
-// Models to keep warm (in priority order)
-const WARMUP_MODELS = [
-  'qwen2.5:1.5b',  // Fast model for simple tasks
-  'qwen2.5:7b',    // Main model for complex tasks
-]
+import { AI_SERVERS, getAllServersHealth, type ServerType } from '@/lib/ai/router'
 
 interface WarmupResult {
+  server: string
   model: string
   status: 'success' | 'error' | 'not_found'
   loadTimeMs?: number
   error?: string
 }
 
-async function warmupModel(model: string): Promise<WarmupResult> {
-  const baseUrl = getOllamaBaseUrl()
+async function warmupModel(serverUrl: string, serverName: string, model: string): Promise<WarmupResult> {
   const startTime = Date.now()
   
   try {
-    // Send a minimal request to load the model
-    const response = await fetch(`${baseUrl}/api/generate`, {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
+    
+    const response = await fetch(`${serverUrl}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         model,
         prompt: 'Hi',
         stream: false,
-        options: {
-          num_predict: 1  // Generate just 1 token - enough to load the model
-        }
+        options: { num_predict: 1 }
       })
     })
+    
+    clearTimeout(timeoutId)
     
     if (!response.ok) {
       const text = await response.text()
       if (text.includes('not found') || text.includes('does not exist')) {
-        return { model, status: 'not_found', error: 'Model not installed' }
+        return { server: serverName, model, status: 'not_found', error: 'Model not installed' }
       }
-      return { model, status: 'error', error: text }
+      return { server: serverName, model, status: 'error', error: text }
     }
     
     return {
+      server: serverName,
       model,
       status: 'success',
       loadTimeMs: Date.now() - startTime
     }
   } catch (error) {
     return {
+      server: serverName,
       model,
       status: 'error',
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -62,18 +61,25 @@ async function warmupModel(model: string): Promise<WarmupResult> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { models } = await request.json().catch(() => ({}))
-    const modelsToWarm = models || WARMUP_MODELS
+    const { server: targetServer } = await request.json().catch(() => ({}))
     
     const results: WarmupResult[] = []
     
-    for (const model of modelsToWarm) {
-      const result = await warmupModel(model)
-      results.push(result)
+    // Determine which servers to warm
+    const serversToWarm: ServerType[] = targetServer 
+      ? [targetServer as ServerType]
+      : ['fast', 'quality']
+    
+    for (const serverKey of serversToWarm) {
+      const serverConfig = AI_SERVERS[serverKey]
       
-      // Small delay between models to not overload
-      if (result.status === 'success') {
-        await new Promise(r => setTimeout(r, 100))
+      for (const model of serverConfig.models) {
+        const result = await warmupModel(serverConfig.url, serverConfig.name, model)
+        results.push(result)
+        
+        if (result.status === 'success') {
+          await new Promise(r => setTimeout(r, 100))
+        }
       }
     }
     
@@ -96,24 +102,71 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  // Check which models are currently loaded
-  const baseUrl = getOllamaBaseUrl()
-  
   try {
-    const response = await fetch(`${baseUrl}/api/ps`)
-    if (!response.ok) {
-      return NextResponse.json({ error: 'Cannot check running models' }, { status: 500 })
-    }
+    const health = await getAllServersHealth()
     
-    const data = await response.json()
+    // Get running models from each server
+    const serverStatus = await Promise.all(
+      Object.entries(AI_SERVERS).map(async ([key, config]) => {
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 5000)
+          
+          const [tagsRes, psRes] = await Promise.all([
+            fetch(`${config.url}/api/tags`, { signal: controller.signal }),
+            fetch(`${config.url}/api/ps`, { signal: controller.signal }).catch(() => null)
+          ])
+          
+          clearTimeout(timeoutId)
+          
+          const tagsData = tagsRes.ok ? await tagsRes.json() : { models: [] }
+          const psData = psRes?.ok ? await psRes.json() : { models: [] }
+          
+          return {
+            server: key,
+            name: config.name,
+            url: config.url,
+            healthy: health[key as ServerType].isHealthy,
+            latency: health[key as ServerType].latency,
+            availableModels: tagsData.models?.map((m: { name: string }) => m.name) || [],
+            runningModels: psData.models?.map((m: { name: string }) => m.name) || [],
+            expectedModels: config.models,
+          }
+        } catch {
+          return {
+            server: key,
+            name: config.name,
+            url: config.url,
+            healthy: false,
+            latency: 0,
+            availableModels: [],
+            runningModels: [],
+            expectedModels: config.models,
+            error: 'Server unreachable'
+          }
+        }
+      })
+    )
     
     return NextResponse.json({
-      runningModels: data.models || [],
-      recommendedWarmup: WARMUP_MODELS
+      servers: serverStatus,
+      allHealthy: serverStatus.every(s => s.healthy),
+      architecture: {
+        fast: {
+          purpose: 'Simple tasks: classification, sentiment, tagging',
+          models: AI_SERVERS.fast.models,
+          timeout: AI_SERVERS.fast.timeout
+        },
+        quality: {
+          purpose: 'Complex tasks: chat, RAG, creative generation',
+          models: AI_SERVERS.quality.models,
+          timeout: AI_SERVERS.quality.timeout
+        }
+      }
     })
   } catch (error) {
     return NextResponse.json(
-      { error: 'Ollama not reachable', details: error instanceof Error ? error.message : 'Unknown' },
+      { error: 'Health check failed', details: error instanceof Error ? error.message : 'Unknown' },
       { status: 503 }
     )
   }

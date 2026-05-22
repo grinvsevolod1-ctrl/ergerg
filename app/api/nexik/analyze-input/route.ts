@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { classifyBusiness, generateClassificationResponse } from '@/lib/ai/classifier'
 import { aiCache } from '@/lib/ai/cache'
-import { getAIResponseWithFallback } from '@/lib/ai/providers'
+import { routedChat, AI_SERVERS } from '@/lib/ai/router'
 
 /**
  * Fast business input analysis
@@ -70,22 +70,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result)
     }
 
-    // 3. Medium confidence or ambiguous - use lightweight AI
+    // 3. Medium confidence or ambiguous - use lightweight AI on FAST server
     // Only for edge cases where classifier isn't sure
     if (classification.confidence >= 0.3 && classification.confidence < 0.6) {
       try {
-        const aiResult = await getAIResponseWithFallback(
+        // Use FAST server with qwen2.5:1.5b for quick analysis
+        const aiResult = await routedChat(
+          'classify',  // Routes to FAST server
           [{ role: 'user', content: input }],
           {
-            model: 'qwen2.5:1.5b',  // Use lightweight model
+            model: AI_SERVERS.fast.defaultModel,  // qwen2.5:1.5b
             system: AI_SYSTEM_PROMPT,
             temperature: 0.3,
-            maxTokens: 150  // Short response
+            maxTokens: 150
           }
         )
         
         // Parse AI response
-        const jsonMatch = aiResult.content.match(/\{[\s\S]*\}/)
+        const jsonMatch = aiResult.response.match(/\{[\s\S]*\}/)
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0])
           
