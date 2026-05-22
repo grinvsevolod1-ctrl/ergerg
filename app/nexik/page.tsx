@@ -214,7 +214,7 @@ function ChatDemo({ visible }: { visible: boolean }) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  const send = useCallback(() => {
+  const send = useCallback(async () => {
     if (!input.trim() || isTyping) return
     
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: input.trim() }
@@ -222,27 +222,55 @@ function ChatDemo({ visible }: { visible: boolean }) {
     setInput("")
     setIsTyping(true)
 
-    setTimeout(() => {
+    try {
+      // Call AI API
+      const response = await fetch('/api/nexik/analyze-input', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          input: userMsg.content,
+          conversationHistory: messages.map(m => ({ role: m.role, content: m.content }))
+        })
+      })
+      
+      const data = await response.json()
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: data.response }])
+    } catch {
+      // Fallback to template
       const response = getResponse(userMsg.content)
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: response }])
-      setIsTyping(false)
-    }, 600)
-  }, [input, isTyping])
+    }
+    
+    setIsTyping(false)
+  }, [input, isTyping, messages])
 
   const quickActions = ["Автосервис", "Салон красоты", "Ресторан", "Клиника", "Магазин", "Фитнес"]
 
-  const sendQuickAction = useCallback((action: string) => {
+  const sendQuickAction = useCallback(async (action: string) => {
     if (isTyping) return
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: `У меня ${action.toLowerCase()}` }
     setMessages(prev => [...prev, userMsg])
     setIsTyping(true)
 
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/nexik/analyze-input', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          input: userMsg.content,
+          conversationHistory: messages.map(m => ({ role: m.role, content: m.content }))
+        })
+      })
+      
+      const data = await response.json()
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: data.response }])
+    } catch {
       const response = getResponse(userMsg.content)
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: response }])
-      setIsTyping(false)
-    }, 600)
-  }, [isTyping])
+    }
+    
+    setIsTyping(false)
+  }, [isTyping, messages])
 
   if (!visible) return null
 
