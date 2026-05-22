@@ -1,0 +1,31 @@
+{
+  "name": "@nexik/vue",
+  "version": "1.0.0",
+  "description": "Nexik AI Chat Widget for Vue 3",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "vue-tsc && vite build",
+    "dev": "vite"
+  },
+  "peerDependencies": {
+    "vue": ">=3.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "vue": "^3.0.0",
+    "vue-tsc": "^1.0.0"
+  },
+  "keywords": ["nexik", "chat", "ai", "widget", "vue", "vue3", "chatbot"],
+  "author": "Nexik Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nexik/vue"
+  },
+  "homepage": "https://nexik.org"
+}

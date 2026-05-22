@@ -1,0 +1,7 @@
+export { PreviewHeader } from "./preview-header"
+export { PreviewHero } from "./preview-hero"
+export { PreviewServices } from "./preview-services"
+export { PreviewFeatures } from "./preview-features"
+export { PreviewTestimonial } from "./preview-testimonial"
+export { PreviewCTA } from "./preview-cta"
+export { PreviewFooter } from "./preview-footer"
