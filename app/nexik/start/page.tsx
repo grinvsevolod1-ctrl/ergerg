@@ -57,15 +57,24 @@ async function analyzeInputWithAI(input: string): Promise<{
   response: string
 }> {
   try {
+    console.log('[v0] analyzeInputWithAI called with:', input)
     const res = await fetch('/api/nexik/analyze-input', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ input })
     })
     
-    if (!res.ok) throw new Error('API error')
-    return await res.json()
-  } catch {
+    console.log('[v0] API response status:', res.status)
+    if (!res.ok) {
+      const errorText = await res.text()
+      console.log('[v0] API error:', errorText)
+      throw new Error('API error')
+    }
+    const data = await res.json()
+    console.log('[v0] API response data:', data)
+    return data
+  } catch (err) {
+    console.log('[v0] analyzeInputWithAI error, using fallback:', err)
     // Fallback на простую эвристику
     const lower = input.toLowerCase()
     const words = lower.split(/\s+/).filter(w => w.length > 1)

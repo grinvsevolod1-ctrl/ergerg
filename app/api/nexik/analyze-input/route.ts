@@ -23,10 +23,17 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
   
   try {
-    const { input } = await request.json()
+    const body = await request.json()
+    const { input } = body
+    
+    console.log('[v0] analyze-input received:', input)
     
     if (!input || typeof input !== 'string') {
-      return NextResponse.json({ error: 'Input required' }, { status: 400 })
+      console.log('[v0] analyze-input: invalid input')
+      return NextResponse.json(
+        { error: 'Input is required' },
+        { status: 400 }
+      )
     }
 
     // 1. Check cache
@@ -46,10 +53,12 @@ export async function POST(request: NextRequest) {
 
     // 2. Try fast classifier
     const classification = classifyBusiness(input)
+    console.log('[v0] classifier result:', classification)
     
     // High confidence - use classifier result directly
     if (classification.confidence >= 0.6) {
       const response = generateClassificationResponse(input, classification)
+      console.log('[v0] High confidence, returning:', { isValid: classification.isValidBusiness, response })
       
       const result = {
         isValidBusiness: classification.isValidBusiness,
