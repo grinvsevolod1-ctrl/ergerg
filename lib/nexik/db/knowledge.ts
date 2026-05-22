@@ -6,7 +6,8 @@ import { query, queryOne, execute } from '@/lib/db'
 import { 
   semanticSearch, 
   getRAGContext as getVectorRAGContext,
-  indexDocument as indexDocumentVector 
+  indexDocument as indexDocumentVector,
+  smartChunk
 } from './vector-search'
 
 export interface KnowledgeDoc {
@@ -147,22 +148,38 @@ export async function processDocument(docId: string): Promise<void> {
     // Delete existing chunks
     await execute('DELETE FROM nexik_knowledge_chunks WHERE doc_id = $1', [docId])
 
-    // Split into chunks
-    const chunks = splitIntoChunks(doc.content, 500, 50) // 500 chars, 50 overlap
+    // Smart chunking with semantic boundaries and overlap
+    const chunks = smartChunk(doc.content, {
+      maxSize: 512,
+      minSize: 100,
+      overlap: 75,
+      preserveStructure: true
+    })
 
-    // Process each chunk
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i]
-      const { tokens, weights } = tokenize(chunk)
-
+    // Process each chunk with metadata
+    for (const chunk of chunks) {
+      const { tokens, weights } = tokenize(chunk.content)
+      
       await execute(
-        `INSERT INTO nexik_knowledge_chunks (doc_id, org_id, content, chunk_index, tokens, token_weights)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [docId, doc.org_id, chunk, i, tokens, JSON.stringify(weights)]
+        `INSERT INTO nexik_knowledge_chunks (doc_id, org_id, content, chunk_index, tokens, token_weights, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          docId, 
+          doc.org_id, 
+          chunk.content, 
+          chunk.index, 
+          tokens, 
+          JSON.stringify(weights),
+          JSON.stringify({
+            ...chunk.metadata,
+            title: doc.title,
+            source_type: doc.source_type
+          })
+        ]
       )
     }
 
-    // Update document status
+    // Update document status (chunks.length is now array of chunk objects)
     await execute(
       "UPDATE nexik_knowledge_docs SET status = 'ready', chunks_count = $1, updated_at = NOW() WHERE id = $2",
       [chunks.length, docId]
@@ -182,30 +199,6 @@ export async function processDocument(docId: string): Promise<void> {
 }
 
 // Text splitting
-function splitIntoChunks(text: string, chunkSize: number, overlap: number): string[] {
-  const chunks: string[] = []
-  const sentences = text.split(/(?<=[.!?])\s+/)
-  
-  let currentChunk = ''
-  
-  for (const sentence of sentences) {
-    if (currentChunk.length + sentence.length > chunkSize && currentChunk.length > 0) {
-      chunks.push(currentChunk.trim())
-      // Keep overlap
-      const words = currentChunk.split(' ')
-      const overlapWords = words.slice(-Math.ceil(overlap / 5))
-      currentChunk = overlapWords.join(' ') + ' '
-    }
-    currentChunk += sentence + ' '
-  }
-  
-  if (currentChunk.trim().length > 0) {
-    chunks.push(currentChunk.trim())
-  }
-  
-  return chunks
-}
-
 // Tokenization for TF-IDF
 function tokenize(text: string): { tokens: string[]; weights: Record<string, number> } {
   // Simple tokenization - in production use proper NLP

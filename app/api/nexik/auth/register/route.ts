@@ -3,10 +3,9 @@ import { cookies } from 'next/headers'
 import { SignJWT } from 'jose'
 import bcrypt from 'bcryptjs'
 import { rateLimiters } from '@/lib/rate-limit'
+import { JWT_SECRET, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.NEXIK_JWT_SECRET || 'nexik-secret-key-change-in-production'
-)
+const BCRYPT_ROUNDS = 12
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,8 +57,8 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Hash password
-      const passwordHash = await bcrypt.hash(password, 10)
+      // Hash password with secure rounds
+      const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
 
       // Create organization
       const orgResult = await query<{ id: string; name: string }>(
@@ -88,19 +87,11 @@ export async function POST(request: NextRequest) {
     } catch (dbError) {
       console.error('[Nexik Register] Database error:', dbError)
       
-      // Demo mode - create temporary session
-      const tempId = `temp_${Date.now()}`
-      user = {
-        id: tempId,
-        email: email.toLowerCase(),
-        name: email.split('@')[0],
-        role: 'owner',
-        org_id: tempId
-      }
-      org = {
-        id: tempId,
-        name: `Организация ${email.split('@')[0]}`
-      }
+      // Return proper error - no demo mode for security
+      return NextResponse.json(
+        { error: 'База данных недоступна. Пожалуйста, попробуйте позже.' },
+        { status: 503 }
+      )
     }
 
     // Create JWT token with payload matching auth service format
@@ -110,20 +101,17 @@ export async function POST(request: NextRequest) {
       email: user.email,
       role: user.role
     })
-      .setProtectedHeader({ alg: 'HS256' })
+      .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
       .setIssuedAt()
-      .setExpirationTime('7d')
+      .setExpirationTime(SESSION_CONFIG.expirationTime)
       .sign(JWT_SECRET)
 
     // Set single session cookie (matching auth service)
     const cookieStore = await cookies()
     
-    cookieStore.set('nexik_session', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/'
+    cookieStore.set(SESSION_CONFIG.cookieName, token, {
+      ...SESSION_CONFIG.cookieOptions,
+      maxAge: SESSION_CONFIG.maxAge
     })
 
     return NextResponse.json({

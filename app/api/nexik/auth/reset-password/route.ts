@@ -3,10 +3,9 @@ import { jwtVerify, SignJWT } from 'jose'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 import { rateLimiters } from '@/lib/rate-limit'
+import { JWT_SECRET, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.NEXIK_JWT_SECRET || 'nexik-secret-key-change-in-production'
-)
+const BCRYPT_ROUNDS = 12
 
 export async function POST(request: NextRequest) {
   try {
@@ -75,8 +74,8 @@ export async function POST(request: NextRequest) {
 
       const member = members[0]
 
-      // Hash new password
-      const passwordHash = await bcrypt.hash(password, 10)
+      // Hash new password with secure rounds
+      const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
 
       // Update password and clear reset token
       await execute(
@@ -100,18 +99,15 @@ export async function POST(request: NextRequest) {
         email: member.email,
         role: member.role
       })
-        .setProtectedHeader({ alg: 'HS256' })
+        .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
         .setIssuedAt()
-        .setExpirationTime('7d')
+        .setExpirationTime(SESSION_CONFIG.expirationTime)
         .sign(JWT_SECRET)
 
       const cookieStore = await cookies()
-      cookieStore.set('nexik_session', sessionToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7,
-        path: '/'
+      cookieStore.set(SESSION_CONFIG.cookieName, sessionToken, {
+        ...SESSION_CONFIG.cookieOptions,
+        maxAge: SESSION_CONFIG.maxAge
       })
 
       return NextResponse.json({

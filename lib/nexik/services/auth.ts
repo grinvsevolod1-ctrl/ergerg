@@ -3,7 +3,7 @@
  * Handles user registration, login, and session management
  */
 
-import { createHash, randomBytes, timingSafeEqual } from 'crypto'
+import bcrypt from 'bcryptjs'
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import {
@@ -17,30 +17,18 @@ import {
   type OrgMember
 } from '../db/organizations'
 import { createWidget } from '../db/widgets'
+import { JWT_SECRET, SESSION_CONFIG } from '../config/jwt'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.NEXIK_JWT_SECRET || 'nexik-default-secret-change-in-production'
-)
-const SESSION_COOKIE = 'nexik_session'
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7 // 7 days
+const BCRYPT_ROUNDS = 12 // Secure default for production
 
-// Password hashing (using scrypt would be better, but this is simpler)
-function hashPassword(password: string): string {
-  const salt = randomBytes(16).toString('hex')
-  const hash = createHash('sha256')
-    .update(password + salt)
-    .digest('hex')
-  return `${salt}:${hash}`
+// Password hashing using bcrypt (industry standard)
+async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS)
 }
 
-function verifyPassword(password: string, stored: string): boolean {
-  const [salt, storedHash] = stored.split(':')
-  const hash = createHash('sha256')
-    .update(password + salt)
-    .digest('hex')
-  
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
   try {
-    return timingSafeEqual(Buffer.from(hash), Buffer.from(storedHash))
+    return await bcrypt.compare(password, stored)
   } catch {
     return false
   }
@@ -57,9 +45,9 @@ export interface SessionPayload {
 
 async function createSessionToken(payload: SessionPayload): Promise<string> {
   return new SignJWT(payload as Record<string, string>)
-    .setProtectedHeader({ alg: 'HS256' })
+    .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(SESSION_CONFIG.expirationTime)
     .sign(JWT_SECRET)
 }
 
@@ -98,7 +86,7 @@ export async function register(input: RegisterInput): Promise<{
     }
 
     // Hash password
-    const passwordHash = hashPassword(input.password)
+    const passwordHash = await hashPassword(input.password)
 
     // Create organization with owner
     const { org, member, apiKey } = await createOrganization({
@@ -125,11 +113,11 @@ export async function register(input: RegisterInput): Promise<{
 
     // Set cookie
     const cookieStore = await cookies()
-    cookieStore.set(SESSION_COOKIE, token, {
+    cookieStore.set(SESSION_CONFIG.cookieName, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: SESSION_MAX_AGE,
+      maxAge: SESSION_CONFIG.maxAge,
       path: '/'
     })
 
@@ -178,7 +166,7 @@ export async function login(input: LoginInput): Promise<{
     }
 
     // Verify password
-    if (!verifyPassword(input.password, member.password_hash)) {
+    if (!await verifyPassword(input.password, member.password_hash)) {
       return { success: false, error: 'Неверный email или пароль' }
     }
 
@@ -201,11 +189,11 @@ export async function login(input: LoginInput): Promise<{
 
     // Set cookie
     const cookieStore = await cookies()
-    cookieStore.set(SESSION_COOKIE, token, {
+    cookieStore.set(SESSION_CONFIG.cookieName, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: SESSION_MAX_AGE,
+      maxAge: SESSION_CONFIG.maxAge,
       path: '/'
     })
 
@@ -219,7 +207,7 @@ export async function login(input: LoginInput): Promise<{
 // Logout
 export async function logout(): Promise<void> {
   const cookieStore = await cookies()
-  cookieStore.delete(SESSION_COOKIE)
+  cookieStore.delete(SESSION_CONFIG.cookieName)
 }
 
 // Get current session
@@ -229,7 +217,7 @@ export async function getSession(): Promise<{
 } | null> {
   try {
     const cookieStore = await cookies()
-    const token = cookieStore.get(SESSION_COOKIE)?.value
+    const token = cookieStore.get(SESSION_CONFIG.cookieName)?.value
     
     if (!token) return null
 
@@ -268,7 +256,7 @@ export async function inviteMember(
   role: 'admin' | 'operator' | 'member',
   tempPassword: string
 ): Promise<OrgMember> {
-  const passwordHash = hashPassword(tempPassword)
+  const passwordHash = await hashPassword(tempPassword)
   return createOrgMember({
     org_id: orgId,
     email,
@@ -293,7 +281,7 @@ export async function changePassword(
     )
 
     const member = members[0]
-    if (!member || !verifyPassword(currentPassword, member.password_hash)) {
+    if (!member || !await verifyPassword(currentPassword, member.password_hash)) {
       return { success: false, error: 'Неверный текущий пароль' }
     }
 
@@ -301,7 +289,7 @@ export async function changePassword(
       return { success: false, error: 'Новый пароль должен быть минимум 8 символов' }
     }
 
-    const newHash = hashPassword(newPassword)
+    const newHash = await hashPassword(newPassword)
     await execute(
       'UPDATE nexik_org_members SET password_hash = $1, updated_at = NOW() WHERE id = $2',
       [newHash, memberId]

@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SignJWT } from 'jose'
 import { rateLimiters } from '@/lib/rate-limit'
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.NEXIK_JWT_SECRET || 'nexik-secret-key-change-in-production'
-)
+import { JWT_SECRET, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,7 +57,7 @@ export async function POST(request: NextRequest) {
         memberId,
         type: 'password_reset'
       })
-        .setProtectedHeader({ alg: 'HS256' })
+        .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
         .setIssuedAt()
         .setExpirationTime('1h')
         .sign(JWT_SECRET)

@@ -15,7 +15,7 @@ import {
 import { getWidget, type Widget, type QuickReply } from '../db/widgets'
 import { getOrganization, incrementMessagesUsed, checkMessageLimit } from '../db/organizations'
 import { getRAGContextForPrompt } from '../db/knowledge'
-import { getOllamaClient } from '@/lib/ai/providers'
+import { getAIResponseWithFallback, type FallbackResponse } from '@/lib/ai/providers'
 import { getConfig } from '@/lib/ai/config'
 import { 
   getOrgTelegramConfig, 
@@ -274,44 +274,57 @@ async function generateAIResponse(
   startTime: number
 ): Promise<Message> {
   const config = getConfig()
-  const client = getOllamaClient()
-
+  
   // Get RAG context
   const ragContext = await getRAGContextForPrompt(orgId, userMessage, 3)
   const ragUsed = !!ragContext
-
+  
   // Build system prompt
   const systemPrompt = buildSystemPrompt(widget, ragContext)
-
+  
   // Get conversation history (last 10 messages for context)
   const history = await getConversationHistory(conversation.id, 10)
-
+  
   // Build messages array
   const messages = history.map(m => ({
     role: m.sender_type === 'visitor' ? 'user' as const : 'assistant' as const,
     content: m.content
   }))
   messages.push({ role: 'user' as const, content: userMessage })
-
-  // Call Ollama
-  const response = await client.chat(messages, {
+  
+  // Call AI with fallback chain (tries multiple models, then rule-based, then graceful degradation)
+  const aiResponse = await getAIResponseWithFallback(messages, {
+    model: widget?.ai_model || config.model,
     system: systemPrompt,
     temperature: widget?.ai_temperature || config.temperature,
-    maxTokens: widget?.ai_max_tokens || config.maxTokens
+    maxTokens: widget?.ai_max_tokens || config.maxTokens,
+    ragContext: ragContext || undefined
   })
-
+  
   const responseTime = Date.now() - startTime
-
+  
+  // Determine sender type based on response source
+  const senderType = aiResponse.source === 'graceful_degradation' ? 'system' : 'ai'
+  
   // Extract quick replies if AI suggested them
-  const quickReplies = extractQuickReplies(response)
-
-  // Save AI message
+  const quickReplies = aiResponse.source === 'ai' || aiResponse.source === 'fallback_ai'
+    ? extractQuickReplies(aiResponse.content)
+    : aiResponse.source === 'graceful_degradation'
+      ? [{ id: 'qr-operator', label: 'Позвать оператора', message: '/operator' }]
+      : []
+  
+  // Log fallback usage for monitoring
+  if (aiResponse.source !== 'ai') {
+    console.log(`[Nexik Chat] AI response source: ${aiResponse.source}, model: ${aiResponse.model || 'N/A'}, error: ${aiResponse.error || 'none'}`)
+  }
+  
+  // Save message
   return addMessage({
     conversation_id: conversation.id,
     org_id: orgId,
-    sender_type: 'ai',
-    content: cleanResponse(response),
-    ai_model: widget?.ai_model || config.model,
+    sender_type: senderType,
+    content: cleanResponse(aiResponse.content),
+    ai_model: aiResponse.model || (aiResponse.source === 'rule_based' ? 'rule-based' : undefined),
     ai_response_time_ms: responseTime,
     rag_context_used: ragUsed,
     quick_replies: quickReplies

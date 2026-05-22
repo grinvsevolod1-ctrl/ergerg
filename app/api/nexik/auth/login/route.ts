@@ -3,10 +3,7 @@ import { cookies } from 'next/headers'
 import { SignJWT } from 'jose'
 import bcrypt from 'bcryptjs'
 import { rateLimiters } from '@/lib/rate-limit'
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.NEXIK_JWT_SECRET || 'nexik-secret-key-change-in-production'
-)
+import { JWT_SECRET, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,22 +80,10 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('[Nexik Auth] Database error:', error)
-      // Continue with demo mode if DB not available
-    }
-
-    // Demo mode - allow test@test.com / test123
-    if (!user && email === 'test@test.com' && password === 'test123') {
-      user = {
-        id: 'demo-user',
-        org_id: 'demo-org',
-        email: 'test@test.com',
-        name: 'Demo User',
-        role: 'owner'
-      }
-      org = {
-        id: 'demo-org',
-        name: 'Demo Organization'
-      }
+      return NextResponse.json(
+        { error: 'База данных недоступна. Попробуйте позже.' },
+        { status: 503 }
+      )
     }
 
     if (!user || !org) {
@@ -115,20 +100,17 @@ export async function POST(request: NextRequest) {
       email: user.email,
       role: user.role
     })
-      .setProtectedHeader({ alg: 'HS256' })
+      .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
       .setIssuedAt()
-      .setExpirationTime('7d')
+      .setExpirationTime(SESSION_CONFIG.expirationTime)
       .sign(JWT_SECRET)
 
     // Set single session cookie (matching auth service)
     const cookieStore = await cookies()
     
-    cookieStore.set('nexik_session', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/'
+    cookieStore.set(SESSION_CONFIG.cookieName, token, {
+      ...SESSION_CONFIG.cookieOptions,
+      maxAge: SESSION_CONFIG.maxAge
     })
 
     return NextResponse.json({
