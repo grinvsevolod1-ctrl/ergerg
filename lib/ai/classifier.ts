@@ -93,7 +93,44 @@ export function classifyBusiness(input: string): ClassificationResult {
     }
   }
   
-  // Check for gibberish
+  // FIRST: Check for business keywords BEFORE gibberish check
+  // This ensures "у меня автосервис" is recognized as business
+  let detectedCategory: string | null = null
+  let keywordMatches = 0
+  
+  for (const [category, keywords] of Object.entries(BUSINESS_KEYWORDS)) {
+    for (const keyword of keywords) {
+      if (text.includes(keyword.toLowerCase())) {
+        detectedCategory = category
+        keywordMatches++
+      }
+    }
+  }
+  
+  // If we found a business keyword, it's likely valid - skip gibberish check
+  if (keywordMatches > 0 && detectedCategory) {
+    // Check for possessive patterns (strong indicator)
+    const hasPossessive = POSSESSIVE_PATTERNS.some(p => p.test(text))
+    
+    // Check for activity verbs
+    const hasActivityVerb = ACTIVITY_VERBS.some(v => text.includes(v))
+    
+    // Calculate confidence
+    let confidence = 0.5 // Base confidence for keyword match
+    
+    if (hasPossessive) confidence += 0.25
+    if (hasActivityVerb) confidence += 0.15
+    if (keywordMatches > 1) confidence += 0.1
+    
+    return {
+      isValidBusiness: true,
+      businessType: detectedCategory,
+      confidence: Math.min(confidence, 0.95),
+      reason: 'keyword_match'
+    }
+  }
+  
+  // THEN: Check for gibberish (only if no business keywords found)
   for (const pattern of GIBBERISH_PATTERNS) {
     if (pattern.test(text)) {
       return {
@@ -107,78 +144,43 @@ export function classifyBusiness(input: string): ClassificationResult {
   
   // Single word that isn't a business keyword - need more context
   if (words.length === 1) {
-    // Check if single word is a business keyword
-    let singleWordMatch = false
-    for (const [, keywords] of Object.entries(BUSINESS_KEYWORDS)) {
-      if (keywords.some(k => text.includes(k.toLowerCase()))) {
-        singleWordMatch = true
-        break
-      }
-    }
-    if (!singleWordMatch) {
-      return {
-        isValidBusiness: false,
-        businessType: null,
-        confidence: 0.7,
-        reason: 'single_word_no_keyword'
-      }
+    return {
+      isValidBusiness: false,
+      businessType: null,
+      confidence: 0.7,
+      reason: 'single_word_no_keyword'
     }
   }
   
-  // Check for possessive patterns (strong indicator)
+  // Check for possessive patterns without keywords (might still be valid)
   const hasPossessive = POSSESSIVE_PATTERNS.some(p => p.test(text))
-  
-  // Check for activity verbs
   const hasActivityVerb = ACTIVITY_VERBS.some(v => text.includes(v))
   
-  // Check for business keywords
-  let detectedCategory: string | null = null
-  let keywordMatches = 0
-  
-  for (const [category, keywords] of Object.entries(BUSINESS_KEYWORDS)) {
-    for (const keyword of keywords) {
-      if (text.includes(keyword.toLowerCase())) {
-        detectedCategory = category
-        keywordMatches++
-      }
+  if (hasPossessive || hasActivityVerb) {
+    // Looks like they're describing a business but we don't recognize keywords
+    return {
+      isValidBusiness: true,
+      businessType: 'other',
+      confidence: 0.6,
+      reason: 'possessive_or_activity'
     }
   }
   
-  // Calculate confidence
-  let confidence = 0
-  const reasons: string[] = []
-  
-  if (keywordMatches > 0) {
-    confidence += 0.4 + (keywordMatches * 0.1)
-    reasons.push('keyword_match')
+  // Default: uncertain, might need more info
+  if (words.length >= 2) {
+    return {
+      isValidBusiness: true,
+      businessType: 'unknown',
+      confidence: 0.4,
+      reason: 'multi_word_unknown'
+    }
   }
-  
-  if (hasPossessive) {
-    confidence += 0.25
-    reasons.push('possessive')
-  }
-  
-  if (hasActivityVerb) {
-    confidence += 0.2
-    reasons.push('activity_verb')
-  }
-  
-  if (words.length >= 3) {
-    confidence += 0.15
-    reasons.push('sufficient_length')
-  }
-  
-  // Normalize confidence
-  confidence = Math.min(confidence, 1)
-  
-  // Decision threshold
-  const isValid = confidence >= 0.35 || keywordMatches > 0
   
   return {
-    isValidBusiness: isValid,
-    businessType: isValid ? (detectedCategory || 'general') : null,
-    confidence,
-    reason: reasons.length > 0 ? reasons.join(',') : 'no_match'
+    isValidBusiness: false,
+    businessType: null,
+    confidence: 0.5,
+    reason: 'unclear'
   }
 }
 
