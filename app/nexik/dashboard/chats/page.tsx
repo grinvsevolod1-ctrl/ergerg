@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   UserCheck,
   Archive,
-  Inbox
+  Inbox,
+  Download
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -126,8 +127,7 @@ export default function ChatsPage() {
       } else {
         setError(data.error || 'Ошибка загрузки')
       }
-    } catch (err) {
-      console.error('[Chats] Load error:', err)
+    } catch {
       setError('Не удалось загрузить диалоги')
     } finally {
       setLoading(false)
@@ -234,6 +234,17 @@ export default function ChatsPage() {
           className="border-[#1a1a2e] hover:bg-white/5"
         >
           <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            const url = `/api/nexik/dashboard/export?format=csv&status=${statusFilter !== 'all' ? statusFilter : ''}`
+            window.open(url, '_blank')
+          }}
+          className="border-[#1a1a2e] hover:bg-white/5 gap-2"
+        >
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:inline">Экспорт</span>
         </Button>
       </div>
 

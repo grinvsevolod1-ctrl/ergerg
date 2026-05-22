@@ -444,8 +444,7 @@ export async function initNexikSchema(): Promise<void> {
     
     CREATE INDEX IF NOT EXISTS idx_nexik_rate_limits_key ON nexik_rate_limits(key, window_start);
   `)
-
-  console.log('[Nexik] Database schema initialized')
+  // Database schema initialized
 }
 
 // Helper to check if schema exists

@@ -1,0 +1,41 @@
+# Caddyfile configuration for multi-domain Next.js standalone
+# 
+# IMPORTANT: This config ensures proper Host header forwarding
+# for Next.js middleware to work with domain-based routing
+
+# Main domain
+netnext.site {
+    reverse_proxy localhost:3000 {
+        # Forward original host header
+        header_up Host {host}
+        header_up X-Forwarded-Host {host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Real-IP {remote_host}
+    }
+}
+
+# Nexik domain - REWRITE (not redirect!)
+nexik.org {
+    reverse_proxy localhost:3000 {
+        # CRITICAL: Forward the original host so middleware can detect nexik.org
+        header_up Host nexik.org
+        header_up X-Forwarded-Host nexik.org
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Real-IP {remote_host}
+    }
+}
+
+www.nexik.org {
+    # Redirect www to non-www
+    redir https://nexik.org{uri} permanent
+}
+
+# Alternative: If you want to use a single block for both domains
+# (netnext.site, nexik.org) {
+#     reverse_proxy localhost:3000 {
+#         header_up Host {host}
+#         header_up X-Forwarded-Host {host}
+#         header_up X-Forwarded-Proto {scheme}
+#         header_up X-Real-IP {remote_host}
+#     }
+# }

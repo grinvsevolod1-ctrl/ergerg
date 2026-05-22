@@ -129,8 +129,7 @@ export default function ChatDetailPage() {
       } else {
         setError(convData.error || msgData.error || 'Ошибка загрузки')
       }
-    } catch (err) {
-      console.error('[ChatDetail] Load error:', err)
+    } catch {
       setError('Не удалось загрузить диалог')
     } finally {
       setLoading(false)
@@ -165,8 +164,7 @@ export default function ChatDetailPage() {
       } else {
         setError(data.error)
       }
-    } catch (err) {
-      console.error('[ChatDetail] Send error:', err)
+    } catch {
       setError('Ошибка отправки')
     } finally {
       setSending(false)
@@ -184,8 +182,8 @@ export default function ChatDetailPage() {
       if (res.ok) {
         setConversation(prev => prev ? { ...prev, status: status as ConversationDetail['status'] } : null)
       }
-    } catch (err) {
-      console.error('[ChatDetail] Status update error:', err)
+    } catch {
+      // Silent fail
     }
   }
 

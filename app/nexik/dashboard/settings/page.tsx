@@ -43,8 +43,8 @@ export default function SettingsPage() {
             aiEnabled: data.widget.aiEnabled ?? prev.aiEnabled,
           }))
         }
-      } catch (err) {
-        console.error('[Settings] Load error:', err)
+      } catch {
+        // Silent fail
       } finally {
         setLoading(false)
       }
@@ -77,8 +77,8 @@ export default function SettingsPage() {
         setSaved(true)
         setTimeout(() => setSaved(false), 3000)
       }
-    } catch (err) {
-      console.error('[Settings] Save error:', err)
+    } catch {
+      // Silent fail
     } finally {
       setSaving(false)
     }

@@ -48,8 +48,7 @@ export async function POST(request: NextRequest) {
         memberExists = true
         memberId = members[0].id
       }
-    } catch (error) {
-      console.error('[Nexik ForgotPassword] Database error:', error)
+    } catch {
       // Continue - we'll send generic response anyway for security
     }
 
@@ -116,17 +115,15 @@ export async function POST(request: NextRequest) {
               `,
             })
             
-            console.log('[Nexik ForgotPassword] Reset email sent to:', email)
+            // Email sent successfully
           } else {
-            // Log reset URL for development
-            console.log('[Nexik ForgotPassword] Reset URL (no SMTP configured):', resetUrl)
+            // No SMTP configured - token stored in DB, user can use reset link
           }
-        } catch (emailError) {
-          console.error('[Nexik ForgotPassword] Email send error:', emailError)
+        } catch {
           // Don't fail the request if email fails
         }
-      } catch (dbError) {
-        console.error('[Nexik ForgotPassword] Token storage error:', dbError)
+      } catch {
+        // Token storage failed silently
       }
     }
 
@@ -136,8 +133,7 @@ export async function POST(request: NextRequest) {
       message: 'Если указанный email зарегистрирован, мы отправили инструкции по восстановлению пароля'
     })
 
-  } catch (error) {
-    console.error('[Nexik ForgotPassword] Error:', error)
+  } catch {
     return NextResponse.json(
       { error: 'Ошибка сервера' },
       { status: 500 }

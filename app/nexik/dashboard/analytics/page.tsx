@@ -48,8 +48,8 @@ export default function AnalyticsPage() {
         if (result.success) {
           setData(result.data)
         }
-      } catch (err) {
-        console.error('Failed to load analytics:', err)
+      } catch {
+        // Silent fail
       } finally {
         setLoading(false)
       }

@@ -76,8 +76,8 @@ export default function SchedulePage() {
           setCustomSchedule(s.customSchedule)
         }
       }
-    } catch (err) {
-      console.error('Failed to load schedule:', err)
+    } catch {
+      // Silent fail
     } finally {
       setLoading(false)
     }
@@ -112,8 +112,7 @@ export default function SchedulePage() {
       } else {
         setError(data.error || 'Не удалось сохранить')
       }
-    } catch (err) {
-      console.error('Failed to save schedule:', err)
+    } catch {
       setError('Ошибка сохранения')
     } finally {
       setSaving(false)

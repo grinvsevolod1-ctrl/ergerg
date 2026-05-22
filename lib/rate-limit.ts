@@ -227,4 +227,50 @@ export const rateLimiters = {
     keyPrefix: 'rl-chat',
     message: 'Too many messages. Please wait a moment before sending more.',
   }),
+  
+  // Auth: 5 requests per 5 minutes (prevent brute force)
+  auth: (request: NextRequest) => withRateLimit(request, {
+    windowMs: 5 * 60 * 1000,
+    maxRequests: 5,
+    keyPrefix: 'rl-auth',
+    message: 'Too many login attempts. Please wait 5 minutes.',
+  }),
+  
+  // Register: 3 requests per hour (prevent mass registration)
+  register: (request: NextRequest) => withRateLimit(request, {
+    windowMs: 60 * 60 * 1000,
+    maxRequests: 3,
+    keyPrefix: 'rl-register',
+    message: 'Too many registration attempts. Please try again later.',
+  }),
+  
+  // Password reset: 3 requests per hour
+  passwordReset: (request: NextRequest) => withRateLimit(request, {
+    windowMs: 60 * 60 * 1000,
+    maxRequests: 3,
+    keyPrefix: 'rl-pwreset',
+    message: 'Too many password reset requests. Please try again later.',
+  }),
+  
+  // Support/Contact: 5 requests per hour
+  support: (request: NextRequest) => withRateLimit(request, {
+    windowMs: 60 * 60 * 1000,
+    maxRequests: 5,
+    keyPrefix: 'rl-support',
+    message: 'Too many support requests. Please try again later.',
+  }),
+  
+  // Widget embed: 200 requests per minute (high traffic)
+  embed: (request: NextRequest) => withRateLimit(request, {
+    windowMs: 60 * 1000,
+    maxRequests: 200,
+    keyPrefix: 'rl-embed',
+  }),
+  
+  // API keys: 100 requests per minute
+  api: (request: NextRequest) => withRateLimit(request, {
+    windowMs: 60 * 1000,
+    maxRequests: 100,
+    keyPrefix: 'rl-api',
+  }),
 }

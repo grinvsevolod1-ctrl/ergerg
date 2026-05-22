@@ -289,7 +289,7 @@ function IntegrationContent() {
     }
 
     if (error) {
-      console.error("OAuth error:", error)
+      // OAuth error logged for debugging
     }
   }, [searchParams])
 
@@ -308,8 +308,8 @@ function IntegrationContent() {
         if (data.success && data.widget?.id) {
           setWidgetId(data.widget.id)
         }
-      } catch (err) {
-        console.error('Failed to load widget ID:', err)
+      } catch {
+        // Silent fail
       }
     }
     

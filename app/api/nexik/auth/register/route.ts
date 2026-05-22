@@ -10,8 +10,8 @@ const JWT_SECRET = new TextEncoder().encode(
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limit: strict for auth endpoints
-    const rateLimitResponse = await rateLimiters.strict(request)
+    // Rate limit: registration (prevent mass registration)
+    const rateLimitResponse = await rateLimiters.register(request)
     if (rateLimitResponse) return rateLimitResponse
     
     const { email, password } = await request.json()

@@ -44,8 +44,8 @@ export default function KnowledgePage() {
       const res = await fetch(`/api/ai/knowledge?clientId=${clientId}`)
       const data = await res.json()
       setDocuments(data.documents || [])
-    } catch (error) {
-      console.error("Failed to load documents:", error)
+    } catch {
+      // Silent fail
     } finally {
       setLoading(false)
     }
@@ -64,8 +64,8 @@ export default function KnowledgePage() {
       const res = await fetch(`/api/ai/knowledge?clientId=${clientId}&query=${encodeURIComponent(searchQuery)}`)
       const data = await res.json()
       setSearchResults(data.results || [])
-    } catch (error) {
-      console.error("Search failed:", error)
+    } catch {
+      // Silent fail
     } finally {
       setIsSearching(false)
     }
@@ -90,8 +90,8 @@ export default function KnowledgePage() {
         setDialogOpen(false)
         loadDocuments()
       }
-    } catch (error) {
-      console.error("Failed to add document:", error)
+    } catch {
+      // Silent fail
     } finally {
       setIsAdding(false)
     }
@@ -115,8 +115,8 @@ export default function KnowledgePage() {
         setDialogOpen(false)
         loadDocuments()
       }
-    } catch (error) {
-      console.error("Failed to add FAQ:", error)
+    } catch {
+      // Silent fail
     } finally {
       setIsAdding(false)
     }
@@ -127,8 +127,8 @@ export default function KnowledgePage() {
     try {
       await fetch(`/api/ai/knowledge?clientId=${clientId}&documentId=${id}`, { method: "DELETE" })
       loadDocuments()
-    } catch (error) {
-      console.error("Failed to delete:", error)
+    } catch {
+      // Silent fail
     }
   }
 

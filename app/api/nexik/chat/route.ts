@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
       // Small delay for natural feel
       await delay(300 + Math.random() * 200)
       
-      console.log(`[Nexik Chat] Template match: ${templateMatch.category}`)
+      // Template match found - fast response
       
       return NextResponse.json({
         text: templateMatch.response,
@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
       previousMessages
     )
     
-    console.log(`[Nexik Chat] AI response generated for: "${message.substring(0, 50)}..."`)
+    // AI response generated successfully
 
     return NextResponse.json({
       text: responseText,

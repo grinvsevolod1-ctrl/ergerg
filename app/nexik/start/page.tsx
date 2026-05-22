@@ -4,16 +4,18 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Send, ArrowRight, Check, Loader2, Globe, Copy, X, Sparkles } from "lucide-react"
+import { Send, ArrowRight, Check, Loader2, Globe, Copy, X, Sparkles, MessageCircle, ExternalLink, Lock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SiriOrb } from "@/components/nexik/siri-orb"
+import { SiriOrb as NetNextSiriOrb } from "@/components/ai-orb"
 
-type Step = "chat" | "website" | "register" | "done"
+type Step = "chat" | "website" | "offer" | "netnext-chat" | "register" | "done"
 
 interface Message {
   id: string
   role: "user" | "assistant"
   content: string
+  buttons?: { label: string; action: string }[]
 }
 
 const businessResponses: Record<string, string> = {
@@ -44,6 +46,7 @@ export default function NexikStartPage() {
   ])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+  const [isThinking, setIsThinking] = useState(false)
   const [websiteUrl, setWebsiteUrl] = useState("")
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [widgetId, setWidgetId] = useState("")
@@ -53,8 +56,18 @@ export default function NexikStartPage() {
   const [password, setPassword] = useState("")
   const [isCreating, setIsCreating] = useState(false)
   const [businessDesc, setBusinessDesc] = useState("")
+  const [userName, setUserName] = useState("")
+  const [userPhone, setUserPhone] = useState("")
+  
+  // NetNext chat state
+  const [netnextMessages, setNetnextMessages] = useState<Message[]>([])
+  const [netnextInput, setNetnextInput] = useState("")
+  const [netnextTyping, setNetnextTyping] = useState(false)
+  const [leadSubmitted, setLeadSubmitted] = useState(false)
+  
   const chatRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const netnextChatRef = useRef<HTMLDivElement>(null)
 
   const handleOrbClick = () => {
     setShowToast(true)
@@ -68,33 +81,48 @@ export default function NexikStartPage() {
   }, [messages])
 
   useEffect(() => {
+    if (netnextChatRef.current) {
+      netnextChatRef.current.scrollTop = netnextChatRef.current.scrollHeight
+    }
+  }, [netnextMessages])
+
+  useEffect(() => {
     inputRef.current?.focus()
   }, [step])
 
   const sendMessage = useCallback(() => {
-    if (!input.trim() || isTyping) return
+    if (!input.trim() || isTyping || isThinking) return
 
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: input }
     setMessages(prev => [...prev, userMsg])
     setBusinessDesc(input)
     setInput("")
-    setIsTyping(true)
-
+    
+    // Показываем "думает" на 1.5-2.5 секунды
+    setIsThinking(true)
+    
+    const thinkingTime = 1500 + Math.random() * 1000
     setTimeout(() => {
-      const response = getResponse(userMsg.content)
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: response + "\n\nУ тебя есть сайт? (можешь пропустить)"
-      }])
-      setIsTyping(false)
-      setStep("website")
-    }, 800)
-  }, [input, isTyping])
+      setIsThinking(false)
+      setIsTyping(true)
+      
+      // Затем печатает ответ
+      setTimeout(() => {
+        const response = getResponse(userMsg.content)
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: response + "\n\nУ тебя есть сайт? (можешь пропустить)"
+        }])
+        setIsTyping(false)
+        setStep("website")
+      }, 800)
+    }, thinkingTime)
+  }, [input, isTyping, isThinking])
 
   const handleWebsiteSubmit = useCallback(async () => {
     if (!websiteUrl.trim()) {
-      setStep("register")
+      setStep("offer")
       return
     }
 
@@ -105,7 +133,171 @@ export default function NexikStartPage() {
   }, [websiteUrl])
 
   const skipWebsite = useCallback(() => {
-    setStep("register")
+    setStep("offer")
+  }, [])
+
+  // Открыть чат с NetNext AI
+  const openNetnextChat = useCallback(() => {
+    setNetnextMessages([{
+      id: "1",
+      role: "assistant",
+      content: `Привет! Я Siri - AI-ассистент NetNext Studio.
+
+Рад, что ты заинтересовался! Расскажу немного о нас:
+
+**NetNext** - это молодая, но амбициозная веб-студия. Мы делаем современные сайты быстро и качественно.
+
+**Специальное предложение для тебя:**
+Сайт с полной интеграцией Nexik AI всего за **3 BYN** и **24 часа работы**!
+
+В эту цену входит:
+- Современный адаптивный дизайн
+- Установленный AI-ассистент Nexik
+- Базовая SEO-оптимизация
+- 30 дней поддержки
+
+Хочешь узнать подробнее или готов оставить заявку?`,
+      buttons: [
+        { label: "Расскажи подробнее", action: "details" },
+        { label: "Хочу заказать!", action: "order" },
+        { label: "Какие есть примеры?", action: "examples" }
+      ]
+    }])
+    setStep("netnext-chat")
+  }, [])
+
+  // Отправка сообщения в чат NetNext - РЕАЛЬНЫЙ AI
+  const sendNetnextMessage = useCallback(async (content?: string) => {
+    const messageText = content || netnextInput.trim()
+    if (!messageText || netnextTyping) return
+
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: messageText }
+    setNetnextMessages(prev => [...prev, userMsg])
+    if (!content) setNetnextInput("")
+    setNetnextTyping(true)
+
+    // Проверяем на контактные данные
+    const lower = messageText.toLowerCase()
+    const hasPhone = lower.match(/(\+7|8|7)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}/) || lower.match(/\d{10,}/)
+    const hasEmail = lower.includes("@")
+    
+    if (hasPhone || hasEmail) {
+      // Сохраняем лид и отправляем в Telegram
+      try {
+        await fetch("/api/leads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            companyName: businessDesc || "Nexik Start - заявка на сайт",
+            phone: messageText.match(/[\d\+\-\(\)\s]+/)?.[0] || "",
+            email: messageText.match(/[\w\.-]+@[\w\.-]+/)?.[0] || "",
+            description: `Заявка из Nexik Start на создание сайта.\nБизнес: ${businessDesc}\nКонтакт: ${messageText}`,
+            niche: businessDesc,
+            source: "nexik_start_netnext",
+            consentGiven: true
+          })
+        })
+        setLeadSubmitted(true)
+        
+        // Ответ на успешную заявку
+        const response: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `Отлично! Записал твои контакты.
+
+Заявка принята! Наш менеджер свяжется с тобой в ближайшее время (обычно в течение часа в рабочее время).
+
+А пока ты можешь создать аккаунт в Nexik и попробовать AI-ассистента прямо сейчас - это бесплатно!`,
+          buttons: [
+            { label: "Создать аккаунт Nexik", action: "register" },
+            { label: "Открыть netnext.site", action: "netnext" }
+          ]
+        }
+        setNetnextMessages(prev => [...prev, response])
+        setNetnextTyping(false)
+        return
+      } catch {
+        // Silent fail for lead submit
+      }
+    }
+
+    // Вызываем реальный AI API
+    try {
+      const res = await fetch("/api/chat/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: `nexik_start_${Date.now()}`,
+          message: messageText,
+          context: {
+            companyName: "NetNext Studio",
+            companyDescription: `Веб-студия NetNext. Клиент интересуется созданием сайта. Его бизнес: ${businessDesc || "не указано"}. Предлагай сайт от 3 BYN (белорусских рублей) и 24 часа работы с интеграцией Nexik AI.`
+          }
+        })
+      })
+
+      const data = await res.json()
+      
+      // Определяем кнопки на основе контекста
+      let buttons: { label: string; action: string }[] = []
+      const responseText = data.text || data.error || "Произошла ошибка, попробуй еще раз"
+      
+      if (responseText.toLowerCase().includes("цен") || responseText.toLowerCase().includes("стоим")) {
+        buttons = [
+          { label: "Хочу заказать!", action: "order" },
+          { label: "Расскажи подробнее", action: "details" }
+        ]
+      } else if (responseText.toLowerCase().includes("контакт") || responseText.toLowerCase().includes("запис")) {
+        buttons = []
+      } else {
+        buttons = [
+          { label: "Расскажи о ценах", action: "prices" },
+          { label: "Хочу заказать", action: "order" }
+        ]
+      }
+
+      const response: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: responseText,
+        buttons
+      }
+
+      setNetnextMessages(prev => [...prev, response])
+    } catch {
+      const response: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Извини, произошла ошибка. Попробуй еще раз или напиши свои контакты - мы свяжемся!",
+        buttons: [{ label: "Хочу заказать", action: "order" }]
+      }
+      setNetnextMessages(prev => [...prev, response])
+    } finally {
+      setNetnextTyping(false)
+    }
+  }, [netnextInput, netnextTyping, businessDesc])
+
+  // Обработка кнопок в чате NetNext
+  const handleNetnextButton = useCallback((action: string) => {
+    if (action === "register") {
+      setStep("register")
+    } else if (action === "netnext") {
+      window.open("https://netnext.site", "_blank")
+    } else {
+      // Отправляем как сообщение
+      const buttonLabels: Record<string, string> = {
+        details: "Расскажи подробнее",
+        order: "Хочу заказать!",
+        examples: "Какие есть примеры?",
+        prices: "Расскажи про цены",
+        discuss: "Давай обсудим"
+      }
+      sendNetnextMessage(buttonLabels[action] || action)
+    }
+  }, [sendNetnextMessage])
+
+  const goToContactForm = useCallback(() => {
+    window.open("https://netnext.site/#contact", "_blank")
   }, [])
 
   const createWidget = useCallback(async () => {
@@ -206,15 +398,21 @@ export default function NexikStartPage() {
                     </div>
                   </motion.div>
                 ))}
-                {isTyping && (
+                {(isTyping || isThinking) && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-teal-500 flex items-center justify-center">
                       <div className="w-2.5 h-2.5 rounded-full bg-black" />
                     </div>
                     <div className="flex gap-1 px-4 py-3 bg-white/5 border border-white/10 rounded-2xl rounded-bl-sm">
-                      <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      {isThinking ? (
+                        <span className="text-sm text-zinc-400">думает...</span>
+                      ) : (
+                        <>
+                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <div className="w-2 h-2 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                        </>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -227,11 +425,12 @@ export default function NexikStartPage() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                   placeholder="Например: у меня автосервис..."
-                  className="w-full px-4 sm:px-5 py-3.5 sm:py-4 pr-14 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-sm sm:text-base text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  disabled={isTyping || isThinking}
+                  className="w-full px-4 sm:px-5 py-3.5 sm:py-4 pr-14 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl text-sm sm:text-base text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
                 />
                 <button
                   onClick={sendMessage}
-                  disabled={!input.trim() || isTyping}
+                  disabled={!input.trim() || isTyping || isThinking}
                   className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-cyan-500 text-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:bg-cyan-400 transition-colors"
                 >
                   <Send className="w-5 h-5" />
@@ -275,6 +474,238 @@ export default function NexikStartPage() {
                 <button onClick={skipWebsite} className="w-full py-3 text-zinc-400 hover:text-white transition-colors text-sm">
                   Пропустить, нет сайта
                 </button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === "offer" && (
+            <motion.div
+              key="offer"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="flex-1 flex flex-col items-center justify-center text-center px-4"
+            >
+              {/* NetNext AI Orb с многослойным свечением */}
+              <div className="relative mb-10">
+                <div className="absolute inset-[-30px] rounded-full bg-gradient-to-r from-teal-500/20 via-cyan-400/15 to-teal-500/20 blur-3xl animate-pulse" />
+                <div className="absolute inset-[-15px] rounded-full bg-teal-400/10 blur-xl" />
+                <motion.div
+                  animate={{ scale: [1, 1.05, 1], rotate: [0, 5, -5, 0] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <NetNextSiriOrb size={90} isHovered={true} />
+                </motion.div>
+              </div>
+              
+              {/* Заголовок с анимацией */}
+              <motion.h2 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="text-2xl sm:text-3xl font-bold mb-4"
+              >
+                <span className="bg-gradient-to-r from-white via-teal-200 to-white bg-clip-text text-transparent">
+                  Нет сайта?
+                </span>
+                <br />
+                <span className="text-teal-400">Это даже лучше!</span>
+              </motion.h2>
+              
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="text-zinc-400 mb-8 max-w-sm text-sm sm:text-base leading-relaxed"
+              >
+                Создадим тебе современный сайт с у��е встроенным{" "}
+                <span className="text-cyan-400 font-medium">Nexik AI</span>
+                {" "}—{" "}
+                <span className="text-white">твой бизнес будет на связи 24/7</span>
+              </motion.p>
+
+              {/* Карточки преимуществ */}
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="grid grid-cols-3 gap-3 mb-8 w-full max-w-sm"
+              >
+                <div className="flex flex-col items-center p-3 bg-gradient-to-b from-teal-500/10 to-transparent border border-teal-500/20 rounded-2xl">
+                  <span className="text-xl sm:text-2xl font-bold text-teal-300">3</span>
+                  <span className="text-[10px] sm:text-xs text-zinc-500 mt-1">BYN</span>
+                </div>
+                <div className="flex flex-col items-center p-3 bg-gradient-to-b from-cyan-500/10 to-transparent border border-cyan-500/20 rounded-2xl">
+                  <span className="text-xl sm:text-2xl font-bold text-cyan-300">24</span>
+                  <span className="text-[10px] sm:text-xs text-zinc-500 mt-1">часа</span>
+                </div>
+                <div className="flex flex-col items-center p-3 bg-gradient-to-b from-teal-500/10 to-transparent border border-teal-500/20 rounded-2xl">
+                  <span className="text-xl sm:text-2xl font-bold text-teal-300">AI</span>
+                  <span className="text-[10px] sm:text-xs text-zinc-500 mt-1">встроен</span>
+                </div>
+              </motion.div>
+              
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="w-full max-w-sm space-y-3"
+              >
+                {/* Главная кнопка - чат с NetNext AI */}
+                <button
+                  onClick={openNetnextChat}
+                  className="group w-full py-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-semibold rounded-2xl hover:from-teal-400 hover:to-cyan-400 transition-all flex items-center justify-center gap-3 shadow-lg shadow-teal-500/25 hover:shadow-teal-500/50 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <MessageCircle className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                  Поговорить с NetNext AI
+                </button>
+
+                {/* Кнопка заказа напрямую */}
+                <button
+                  onClick={goToContactForm}
+                  className="w-full py-3.5 bg-white/5 text-zinc-300 font-medium rounded-xl hover:bg-white/10 transition-all flex items-center justify-center gap-2 border border-white/10 hover:border-white/20 text-sm"
+                >
+                  <ExternalLink className="w-4 h-4 text-zinc-500" />
+                  <span>Оставить заявку на netnext.site</span>
+                </button>
+
+                {/* Разделитель */}
+                <div className="flex items-center gap-4 py-2">
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                  <span className="text-[10px] text-zinc-600 uppercase tracking-widest">или</span>
+                  <div className="flex-1 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                </div>
+
+                {/* Кнопка "другая сфера" - неактивная */}
+                <div className="relative group">
+                  <button
+                    disabled
+                    className="w-full py-3 bg-transparent text-zinc-600 text-sm rounded-xl cursor-not-allowed flex items-center justify-center gap-2 border border-dashed border-white/10"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    Использовать в другой сфере
+                  </button>
+                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2.5 py-1 bg-zinc-900/90 backdrop-blur border border-white/10 text-[10px] text-zinc-400 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                    Скоро
+                  </div>
+                </div>
+
+                {/* Кнопка продолжить без сайта */}
+                <button 
+                  onClick={() => setStep("register")} 
+                  className="w-full py-2 text-zinc-600 hover:text-zinc-400 transition-colors text-xs"
+                >
+                  У меня есть сайт, пропустить
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {step === "netnext-chat" && (
+            <motion.div
+              key="netnext-chat"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="flex-1 flex flex-col min-h-0 max-h-full"
+            >
+              {/* Header чата */}
+              <div className="flex-shrink-0 flex items-center gap-3 pb-4 mb-4 border-b border-white/10">
+                <div className="relative">
+                  <div className="absolute inset-[-4px] rounded-full bg-teal-500/20 blur-md" />
+                  <NetNextSiriOrb size={44} isHovered={netnextTyping} />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-white">NetNext AI</div>
+                  <div className="text-xs text-teal-400">Онлайн</div>
+                </div>
+                <button 
+                  onClick={() => setStep("offer")} 
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-5 h-5 text-zinc-400" />
+                </button>
+              </div>
+
+              {/* Сообщения - фиксированная высота с внутренним скроллом */}
+              <div 
+                ref={netnextChatRef} 
+                className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+              >
+                {netnextMessages.map((msg, i) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.03 }}
+                    className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
+                  >
+                    <div className={cn("flex flex-col", msg.role === "user" ? "items-end" : "items-start", "max-w-[85%]")}>
+                      <div className="flex items-end gap-2">
+                        {msg.role === "assistant" && (
+                          <div className="flex-shrink-0 mb-1">
+                            <NetNextSiriOrb size={28} />
+                          </div>
+                        )}
+                        <div className={cn(
+                          "px-4 py-2.5 rounded-2xl text-sm leading-relaxed",
+                          msg.role === "user"
+                            ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-black font-medium rounded-br-md"
+                            : "bg-zinc-800/80 border border-zinc-700/50 text-zinc-100 rounded-bl-md"
+                        )}>
+                          <span className="whitespace-pre-line">{msg.content}</span>
+                        </div>
+                      </div>
+                      {/* Кнопки */}
+                      {msg.buttons && msg.buttons.length > 0 && (
+                        <div className={cn("flex flex-wrap gap-2 mt-2", msg.role === "assistant" && "ml-9")}>
+                          {msg.buttons.map((btn, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleNetnextButton(btn.action)}
+                              className="px-3 py-1.5 text-xs font-medium bg-teal-500/10 text-teal-300 rounded-lg hover:bg-teal-500/20 transition-colors border border-teal-500/20"
+                            >
+                              {btn.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+                {netnextTyping && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-end gap-2">
+                    <div className="flex-shrink-0 mb-1">
+                      <NetNextSiriOrb size={28} isHovered={true} />
+                    </div>
+                    <div className="flex gap-1.5 px-4 py-3 bg-zinc-800/80 border border-zinc-700/50 rounded-2xl rounded-bl-md">
+                      <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <div className="w-2 h-2 bg-teal-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Поле ввода */}
+              <div className="flex-shrink-0 pt-4 mt-auto">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={netnextInput}
+                    onChange={(e) => setNetnextInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendNetnextMessage()}
+                    placeholder="Напиши сообщение..."
+                    className="w-full px-4 py-3.5 pr-14 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500/50 focus:bg-zinc-800/80 transition-all"
+                  />
+                  <button
+                    onClick={() => sendNetnextMessage()}
+                    disabled={!netnextInput.trim() || netnextTyping}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 text-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed hover:from-teal-400 hover:to-cyan-400 transition-all"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -347,7 +778,7 @@ export default function NexikStartPage() {
       </main>
 
       <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
-        <SiriOrb size={48} color="#00ffff" state={isTyping || isAnalyzing || isCreating ? "thinking" : "idle"} onClick={handleOrbClick} />
+        <SiriOrb size={48} color="#00ffff" state={isTyping || isAnalyzing || isCreating || isThinking || netnextTyping ? "thinking" : "idle"} onClick={handleOrbClick} />
       </div>
 
       <AnimatePresence>
@@ -368,7 +799,7 @@ export default function NexikStartPage() {
                   <Sparkles className="w-5 h-5 text-cyan-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white mb-1">Демо виджета Nexik</p>
+                  <p className="text-sm font-medium text-white mb-1">Де��о виджета Nexik</p>
                   <p className="text-xs text-zinc-400 leading-relaxed">Так будет выглядеть AI-чат на вашем сайте. Клиенты смогут общаться с ботом 24/7.</p>
                 </div>
               </div>

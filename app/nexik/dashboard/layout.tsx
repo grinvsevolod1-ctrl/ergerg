@@ -19,7 +19,8 @@ import {
   User,
   ChevronDown,
   BarChart3,
-  Users
+  Users,
+  Webhook
 } from "lucide-react"
 import { NetNextLogo } from "@/components/netnext-logo"
 import { cn } from "@/lib/utils"
@@ -44,6 +45,7 @@ const navItems = [
   { href: "/nexik/dashboard/team", icon: Users, label: "Команда" },
   { href: "/nexik/dashboard/integration", icon: Plug, label: "Интеграция" },
   { href: "/nexik/dashboard/widget", icon: Code, label: "Виджет" },
+  { href: "/nexik/dashboard/webhooks", icon: Webhook, label: "Webhooks" },
   { href: "/nexik/dashboard/api-keys", icon: Key, label: "API ключи" },
   { href: "/nexik/dashboard/settings", icon: Settings, label: "Настройки" },
 ]

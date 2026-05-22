@@ -217,9 +217,8 @@ POST /api/nexik/auth/login
 }
 ```
 
-Sets HTTP-only cookies:
-- `nexik_token` - JWT authentication token
-- `nexik_org_id` - Organization ID
+Sets HTTP-only cookie:
+- `nexik_session` - JWT authentication token (contains memberId, orgId, email, role)
 
 ---
 
