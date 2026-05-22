@@ -51,47 +51,26 @@ function getResponse(input: string): string {
 }
 
 // Анализ ввода через AI
-async function analyzeInputWithAI(input: string): Promise<{
+async function analyzeInputWithAI(input: string, conversationHistory: Array<{role: string, content: string}> = []): Promise<{
   isValidBusiness: boolean
   businessType: string | null
   response: string
 }> {
   try {
-    console.log('[v0] analyzeInputWithAI called with:', input)
     const res = await fetch('/api/nexik/analyze-input', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ input })
+      body: JSON.stringify({ input, conversationHistory })
     })
     
-    console.log('[v0] API response status:', res.status)
-    if (!res.ok) {
-      const errorText = await res.text()
-      console.log('[v0] API error:', errorText)
-      throw new Error('API error')
-    }
-    const data = await res.json()
-    console.log('[v0] API response data:', data)
-    return data
-  } catch (err) {
-    console.log('[v0] analyzeInputWithAI error, using fallback:', err)
-    // Fallback на простую эвристику
-    const lower = input.toLowerCase()
-    const words = lower.split(/\s+/).filter(w => w.length > 1)
-    
-    // Минимум 2 слова для валидного описания
-    if (words.length < 2) {
-      return {
-        isValidBusiness: false,
-        businessType: null,
-        response: 'Расскажи чуть подробнее - чем занимается твой бизнес?'
-      }
-    }
-    
+    if (!res.ok) throw new Error('API error')
+    return await res.json()
+  } catch {
+    // Fallback
     return {
-      isValidBusiness: true,
-      businessType: input,
-      response: getResponse(input)
+      isValidBusiness: false,
+      businessType: null,
+      response: 'Расскажи подробнее - какой у тебя бизнес?'
     }
   }
 }
@@ -100,7 +79,7 @@ export default function NexikStartPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>("chat")
   const [messages, setMessages] = useState<Message[]>([
-    { id: "1", role: "assistant", content: "Привет! Расскажи о своем бизнесе в одном предложении." }
+    { id: "1", role: "assistant", content: "Привет! Я Nexik - AI-помощник для бизнеса. Расскажи, чем занимаешься? Или спроси что-нибудь обо мне." }
   ])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
@@ -208,8 +187,11 @@ export default function NexikStartPage() {
     setIsThinking(true)
     
     try {
-      // Анализируем ввод через AI
-      const analysis = await analyzeInputWithAI(userMsg.content)
+      // Собираем историю для контекста
+      const history = messages.map(m => ({ role: m.role, content: m.content }))
+      
+      // Анализируем ввод через AI с историей
+      const analysis = await analyzeInputWithAI(userMsg.content, history)
       
       setIsThinking(false)
       setIsTyping(true)
