@@ -2,7 +2,7 @@
  * Nexik AI Router - Dual Server Architecture
  * 
  * FAST server (2.26.75.147): qwen2.5:1.5b, qwen2.5:3b - for simple tasks
- * QUALITY server (31.76.93.2): qwen2.5:7b - for complex tasks
+ * QUALITY server (31.76.93.2): qwen2.5:32b-instruct-q4_K_M, qwen2.5:14b - for complex tasks
  */
 
 import { getConfig } from './config'
@@ -22,12 +22,13 @@ export const AI_SERVERS = {
   quality: {
     name: 'QUALITY',
     url: process.env.OLLAMA_QUALITY_URL || 'http://31.76.93.2:11434',
-    models: ['qwen2.5:7b'],
-    defaultModel: 'qwen2.5:7b',
-    complexModel: 'qwen2.5:7b',
+    models: ['qwen2.5:32b-instruct-q4_K_M', 'qwen2.5:14b', 'qwen2.5:7b'],
+    defaultModel: 'qwen2.5:32b-instruct-q4_K_M',  // 32B - максимальное качество
+    complexModel: 'qwen2.5:32b-instruct-q4_K_M',
+    fallbackModel: 'qwen2.5:14b',  // Fallback если 32b не справляется
     tasks: ['chat', 'rag', 'complex', 'creative', 'generate'],
-    maxTokens: 2048,
-    timeout: 120000,
+    maxTokens: 4096,  // 32b поддерживает больше токенов
+    timeout: 180000,  // 3 минуты для больших ответов
   },
 } as const
 
