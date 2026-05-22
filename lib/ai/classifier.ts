@@ -27,7 +27,7 @@ const BUSINESS_KEYWORDS: Record<string, string[]> = {
   'finance': ['финансы', 'бухгалтер', 'инвестиции', 'кредит', 'finance', 'accounting', 'банк'],
   'travel': ['туризм', 'путешествия', 'отель', 'travel', 'tourism', 'hotel', 'турагентство'],
   'entertainment': ['развлечения', 'event', 'праздник', 'мероприятие', 'entertainment', 'клуб', 'бар'],
-  'adult': ['adult', 'порно', 'эскорт', '18+', 'стриптиз', 'контент для взрослых', 'onlyfans'],
+  'adult': ['adult', 'порно', 'эскорт', '18+', 'стриптиз', 'контент для взрослых', 'onlyfans', 'порностудия', 'вебкам', 'webcam'],
   'ecommerce': ['интернет-магазин', 'онлайн', 'маркетплейс', 'e-commerce', 'ecommerce', 'wildberries', 'ozon'],
   'manufacturing': ['производство', 'фабрика', 'завод', 'manufacturing', 'factory', 'цех'],
   'logistics': ['доставка', 'логистика', 'грузоперевозки', 'курьер', 'logistics', 'delivery', 'shipping'],
@@ -51,11 +51,16 @@ const POSSESSIVE_PATTERNS = [
 
 // Gibberish patterns to reject
 const GIBBERISH_PATTERNS = [
-  /^[а-яa-z]{1,3}$/i,           // Too short (1-3 letters)
-  /(.)\1{3,}/i,                  // Repeated chars (aaaa, ооооо)
-  /^(тест|test|hello|привет|хай|hi|йцукен|qwerty|asdf|фыва)$/i,  // Test words
+  /^[а-яa-z]{1,2}$/i,           // Too short (1-2 letters only)
+  /(.)\1{4,}/i,                  // Repeated chars (aaaaa, ооооооо)
+  /^(тест|test|hello|йцукен|qwerty|asdf|фыва)$/i,  // Test words only
   /^[0-9\s\W]+$/,                // Only numbers/symbols
-  /^(хз|пофиг|незнаю|не знаю|потом|ничего|нет)$/i,  // Refusals
+]
+
+// Greetings - valid but need business info
+const GREETING_PATTERNS = [
+  /^(привет|хай|hi|hello|здравствуй|добрый\s+(день|вечер|утро))[\s!.,]*$/i,
+  /^(как дела|как ты|что делаешь)[\s?!.,]*$/i,
 ]
 
 // Clean profanity but keep message
@@ -76,9 +81,21 @@ export function classifyBusiness(input: string): ClassificationResult {
   const text = cleanText(original).toLowerCase()
   const words = text.split(/\s+/).filter(w => w.length > 1)
   
+  // Check for greetings first - need more info
+  for (const pattern of GREETING_PATTERNS) {
+    if (pattern.test(original)) {
+      return {
+        isValidBusiness: false,
+        businessType: null,
+        confidence: 0.9,
+        reason: 'greeting_only'
+      }
+    }
+  }
+  
   // Check for gibberish
   for (const pattern of GIBBERISH_PATTERNS) {
-    if (pattern.test(original)) {
+    if (pattern.test(text)) {
       return {
         isValidBusiness: false,
         businessType: null,
@@ -88,13 +105,23 @@ export function classifyBusiness(input: string): ClassificationResult {
     }
   }
   
-  // Too short
-  if (words.length < 2) {
-    return {
-      isValidBusiness: false,
-      businessType: null,
-      confidence: 0.8,
-      reason: 'too_short'
+  // Single word that isn't a business keyword - need more context
+  if (words.length === 1) {
+    // Check if single word is a business keyword
+    let singleWordMatch = false
+    for (const [, keywords] of Object.entries(BUSINESS_KEYWORDS)) {
+      if (keywords.some(k => text.includes(k.toLowerCase()))) {
+        singleWordMatch = true
+        break
+      }
+    }
+    if (!singleWordMatch) {
+      return {
+        isValidBusiness: false,
+        businessType: null,
+        confidence: 0.7,
+        reason: 'single_word_no_keyword'
+      }
     }
   }
   
