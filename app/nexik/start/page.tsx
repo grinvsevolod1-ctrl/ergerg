@@ -50,51 +50,42 @@ function getResponse(input: string): string {
   return businessResponses.default
 }
 
-// Проверка на бессмысленный ввод
-function isGibberish(input: string): boolean {
-  const lower = input.toLowerCase().trim()
-  
-  // Слишком короткий текст (меньше 3 слов)
-  const words = lower.split(/\s+/).filter(w => w.length > 1)
-  if (words.length < 2) return true
-  
-  // Повторяющиеся символы
-  if (/(.)\1{4,}/.test(lower)) return true
-  
-  // Только цифры или спец символы
-  if (/^[\d\s\W]+$/.test(lower)) return true
-  
-  // Бессмысленные наборы букв (нет гласных или только согласные)
-  const russianVowels = /[аеёиоуыэюя]/
-  const englishVowels = /[aeiou]/
-  const hasRussianLetters = /[а-яё]/.test(lower)
-  const hasEnglishLetters = /[a-z]/.test(lower)
-  
-  if (hasRussianLetters && !russianVowels.test(lower)) return true
-  if (hasEnglishLetters && !hasRussianLetters && !englishVowels.test(lower)) return true
-  
-  // Слова из списка бессмысленных
-  const gibberishWords = [
-    'asdf', 'qwerty', 'йцукен', 'фыва', 'test', 'тест', 'ааа', 'ввв',
-    'хз', 'пофиг', 'лол', 'кек', 'хаха', 'ыыы', 'эээ', '...', '???',
-    'ничего', 'незнаю', 'не знаю', 'потом', 'хуй', 'пизд', 'бля', 'нах'
-  ]
-  
-  for (const word of gibberishWords) {
-    if (lower.includes(word)) return true
+// Анализ ввода через AI
+async function analyzeInputWithAI(input: string): Promise<{
+  isValidBusiness: boolean
+  businessType: string | null
+  response: string
+}> {
+  try {
+    const res = await fetch('/api/nexik/analyze-input', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input })
+    })
+    
+    if (!res.ok) throw new Error('API error')
+    return await res.json()
+  } catch {
+    // Fallback на простую эвристику
+    const lower = input.toLowerCase()
+    const words = lower.split(/\s+/).filter(w => w.length > 1)
+    
+    // Минимум 2 слова для валидного описания
+    if (words.length < 2) {
+      return {
+        isValidBusiness: false,
+        businessType: null,
+        response: 'Расскажи чуть подробнее - чем занимается твой бизнес?'
+      }
+    }
+    
+    return {
+      isValidBusiness: true,
+      businessType: input,
+      response: getResponse(input)
+    }
   }
-  
-  return false
 }
-
-// Ответы на бессмысленный ввод
-const gibberishResponses = [
-  "Хм, не совсем понял. Расскажи конкретнее - чем занимается твой бизнес? Например: 'У меня автосервис' или 'Продаю косметику онлайн'",
-  "Давай попробуем ещё раз. Просто опиши свой бизнес в 2-3 словах. Что ты продаёшь или какие услуги оказываешь?",
-  "Мне нужно понять твою нишу, чтобы помочь. Напиши, например: 'кофейня', 'юридические услуги', 'интернет-магазин одежды'"
-]
-
-let gibberishCount = 0
 
 export default function NexikStartPage() {
   const router = useRouter()
@@ -197,7 +188,7 @@ export default function NexikStartPage() {
     }
   }, [isListening])
 
-  const sendMessage = useCallback(() => {
+  const sendMessage = useCallback(async () => {
     if (!input.trim() || isTyping || isThinking) return
 
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: input }
@@ -207,50 +198,57 @@ export default function NexikStartPage() {
     // Показываем "думает"
     setIsThinking(true)
     
-    const thinkingTime = 1500 + Math.random() * 1000
-    setTimeout(() => {
+    try {
+      // Анализируем ввод через AI
+      const analysis = await analyzeInputWithAI(userMsg.content)
+      
       setIsThinking(false)
       setIsTyping(true)
       
-      setTimeout(() => {
-        // Проверяем на бессмысленный ввод
-        if (isGibberish(userMsg.content)) {
-          gibberishCount++
-          
-          let response = gibberishResponses[Math.min(gibberishCount - 1, gibberishResponses.length - 1)]
-          
-          // После 2 попыток предлагаем микрофон
-          if (gibberishCount >= 2 && voiceSupported) {
-            response += "\n\nИли если не хочешь печатать - нажми на микрофон и просто расскажи голосом!"
-          }
-          
-          setMessages(prev => [...prev, {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: response
-          }])
-          setIsTyping(false)
-          return
+      // Небольшая задержка для эффекта печати
+      await new Promise(r => setTimeout(r, 800))
+      
+      if (analysis.isValidBusiness) {
+        // Валидный бизнес - сохраняем и идём дальше
+        setBusinessDesc(analysis.businessType || userMsg.content)
+        
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: analysis.response
+        }])
+        setIsTyping(false)
+        
+        // Переходим к выбору платформ
+        setTimeout(() => {
+          setStep("platforms")
+        }, 1500)
+      } else {
+        // Невалидный ввод - просим уточнить
+        let response = analysis.response
+        
+        // Предлагаем микрофон если поддерживается
+        if (voiceSupported) {
+          response += "\n\nИли нажми на микрофон и просто расскажи голосом!"
         }
         
-        // Сбрасываем счётчик при нормальном вводе
-        gibberishCount = 0
-        setBusinessDesc(userMsg.content)
-        
-        const response = getResponse(userMsg.content)
         setMessages(prev => [...prev, {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content: response
         }])
         setIsTyping(false)
-        
-        // Переходим к выбору платформ через небольшую паузу
-        setTimeout(() => {
-          setStep("platforms")
-        }, 1500)
-      }, 800)
-    }, thinkingTime)
+      }
+    } catch {
+      setIsThinking(false)
+      setIsTyping(false)
+      
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "Произошла ошибка. Попробуй ещё раз - расскажи о своём бизнесе."
+      }])
+    }
   }, [input, isTyping, isThinking, voiceSupported])
 
   // Выбор платформы
@@ -364,7 +362,7 @@ export default function NexikStartPage() {
           message: messageText,
           context: {
             companyName: "NetNext Studio",
-            companyDescription: `Веб-студия NetNext. Клиент интересуется созданием сайта. Его бизнес: ${businessDesc || "не указано"}. Предлагай сайт от 3 BYN (белорусских рублей) и 24 часа работы с интеграцией Nexik AI.`
+            companyDescription: `Веб-студия NetNext. Клиент интересуется созданием сайта. Его бизнес: ${businessDesc || "не указано"}. Предлагай сайт от 3 BYN (белору��ских рублей) и 24 часа работы с интеграцией Nexik AI.`
           }
         })
       })
