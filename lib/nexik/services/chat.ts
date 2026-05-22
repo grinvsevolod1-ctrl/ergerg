@@ -29,6 +29,12 @@ import { analyzeAndUpdateSentiment, type SentimentResult } from './sentiment'
 import { detectAndUpdateLanguage, getLanguagePromptModifier, type LanguageDetectionResult } from './language'
 import { autoTag, updateConversationTags } from './tagging'
 import { getActiveModel } from './training'
+// Human-like AI features
+import { getVisitorMemory, updateMemoryFromMessage, generatePersonalizedGreeting } from './memory'
+import { getPersonality, humanizeResponse, DEFAULT_PERSONALITY } from './personality'
+import { buildEnhancedContext, buildHumanBehaviorInstructions } from './context-injection'
+import { recordInteraction, recordCorrection } from './feedback-loop'
+import { routedChat, AI_SERVERS } from '@/lib/ai/router'
 
 // Schedule types
 interface Schedule {
@@ -194,6 +200,20 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
     }
   }
 
+  // 5. Update visitor memory with extracted info
+  await updateMemoryFromMessage(
+    request.org_id,
+    request.visitor_id,
+    request.message,
+    {
+      name: request.visitor_info?.name,
+      email: request.visitor_info?.email,
+      phone: request.visitor_info?.phone,
+      pageUrl: request.page_url,
+      sentiment: sentimentResult.message.label
+    }
+  )
+
   // Check message quota
   const quotaCheck = await checkMessageLimit(request.org_id)
   if (!quotaCheck.allowed) {
@@ -286,7 +306,8 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
         widget,
         request.org_id,
         startTime,
-        languageResult.language
+        languageResult.language,
+        request.visitor_id
       )
       
       // Increment usage
@@ -323,7 +344,8 @@ async function generateAIResponse(
   widget: Widget | null,
   orgId: string,
   startTime: number,
-  detectedLanguage?: string
+  detectedLanguage?: string,
+  visitorId?: string
 ): Promise<Message> {
   const config = getConfig()
   
@@ -331,12 +353,44 @@ async function generateAIResponse(
   const customModel = await getActiveModel(orgId)
   const modelToUse = customModel?.adapter_path || widget?.ai_model || config.model
   
+  // Get visitor memory for personalization
+  const memory = visitorId ? await getVisitorMemory(orgId, visitorId) : null
+  
+  // Get organization personality
+  const personality = await getPersonality(orgId) || DEFAULT_PERSONALITY
+  
   // Get RAG context
   const ragContext = await getRAGContextForPrompt(orgId, userMessage, 3)
   const ragUsed = !!ragContext
   
-  // Build system prompt with language modifier
-  let systemPrompt = buildSystemPrompt(widget, ragContext)
+  // Build enhanced context with memory, personality, and RAG
+  const enhancedContext = await buildEnhancedContext({
+    orgId,
+    visitorId: visitorId || conversation.visitor_id,
+    currentMessage: userMessage,
+    conversationId: conversation.id,
+    widget: widget || undefined,
+    pageUrl: undefined,
+    pageTitle: undefined
+  })
+  
+  // Build system prompt with human behavior instructions
+  let systemPrompt = widget?.system_prompt || `Ты — AI-ассистент. Отвечай вежливо и профессионально.`
+  
+  // Add human behavior instructions
+  systemPrompt = buildHumanBehaviorInstructions(personality) + '\n\n' + systemPrompt
+  
+  // Add memory context if available
+  if (enhancedContext.memoryContext) {
+    systemPrompt += `\n\n=== ПАМЯТЬ О КЛИЕНТЕ ===\n${enhancedContext.memoryContext}`
+  }
+  
+  // Add RAG context
+  if (ragContext) {
+    systemPrompt += `\n\n=== БАЗА ЗНАНИЙ ===\n${ragContext}\n\nИспользуй информацию из базы знаний для ответа.`
+  }
+  
+  // Add language modifier
   if (detectedLanguage) {
     const langModifier = getLanguagePromptModifier(detectedLanguage as Parameters<typeof getLanguagePromptModifier>[0])
     if (langModifier) {
@@ -354,55 +408,60 @@ async function generateAIResponse(
   }))
   messages.push({ role: 'user' as const, content: userMessage })
   
-  // Call AI with fallback chain (tries multiple models, then rule-based, then graceful degradation)
-  const aiResponse = await getAIResponseWithFallback(messages, {
+  // Use routed chat to send to appropriate server
+  const aiResult = await routedChat('chat', messages, {
     model: modelToUse,
     system: systemPrompt,
     temperature: widget?.ai_temperature || config.temperature,
-    maxTokens: widget?.ai_max_tokens || config.maxTokens,
-    ragContext: ragContext || undefined
+    maxTokens: widget?.ai_max_tokens || config.maxTokens
   })
   
   const responseTime = Date.now() - startTime
   
-  // Determine sender type based on response source
-  const senderType = aiResponse.source === 'graceful_degradation' ? 'system' : 'ai'
-  
-  // Extract quick replies if AI suggested them
-  const quickReplies = aiResponse.source === 'ai' || aiResponse.source === 'fallback_ai'
-    ? extractQuickReplies(aiResponse.content)
-    : aiResponse.source === 'graceful_degradation'
-      ? [{ id: 'qr-operator', label: 'Позвать оператора', message: '/operator' }]
-      : []
-  
-  // Log fallback usage for monitoring
-  if (aiResponse.source !== 'ai') {
-    console.log(`[Nexik Chat] AI response source: ${aiResponse.source}, model: ${aiResponse.model || 'N/A'}, error: ${aiResponse.error || 'none'}`)
+  // Humanize the response using personality
+  let finalContent = aiResult.response
+  if (personality && aiResult.server !== 'error') {
+    finalContent = humanizeResponse(finalContent, personality, {
+      visitorName: memory?.name || undefined,
+      isFirstMessage: history.length === 0,
+      sentiment: undefined
+    })
   }
   
-  // Save message
-  return addMessage({
+  // Determine sender type
+  const senderType = aiResult.server === 'error' ? 'system' : 'ai'
+  
+  // Extract quick replies if AI suggested them
+  const quickReplies = senderType === 'ai'
+    ? extractQuickReplies(finalContent)
+    : [{ id: 'qr-operator', label: 'Позвать оператора', message: '/operator' }]
+  
+  // Record interaction for feedback loop
+  const savedMessage = await addMessage({
     conversation_id: conversation.id,
     org_id: orgId,
     sender_type: senderType,
-    content: cleanResponse(aiResponse.content),
-    ai_model: aiResponse.model || (aiResponse.source === 'rule_based' ? 'rule-based' : undefined),
+    content: cleanResponse(finalContent),
+    ai_model: aiResult.model || modelToUse,
     ai_response_time_ms: responseTime,
     rag_context_used: ragUsed,
     quick_replies: quickReplies
   })
-}
-
-function buildSystemPrompt(widget: Widget | null, ragContext: string | null): string {
-  let prompt = widget?.system_prompt || `Ты — AI-ассистент. Отвечай вежливо и профессионально.
-Если не знаешь ответа — честно скажи об этом и предложи связаться с оператором.
-Отвечай кратко, но информативно. Не выдумывай информацию.`
-
-  if (ragContext) {
-    prompt += `\n\n${ragContext}\n\nИспользуй информацию из контекста выше для ответа. Если вопрос не связан с контекстом, отвечай на основе общих знаний.`
+  
+  // Record for feedback system (for future training)
+  if (senderType === 'ai') {
+    await recordInteraction(
+      orgId,
+      conversation.id,
+      savedMessage.id,
+      userMessage,
+      finalContent,
+      aiResult.model || modelToUse,
+      ragUsed
+    ).catch(() => {}) // Don't fail if feedback recording fails
   }
-
-  return prompt
+  
+  return savedMessage
 }
 
 async function getConversationHistory(conversationId: string, limit: number): Promise<Message[]> {
