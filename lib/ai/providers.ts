@@ -9,6 +9,7 @@
  */
 
 import { getConfig, type OllamaConfig, OLLAMA_MODELS } from './config'
+import { aiCache } from './cache'
 
 // =====================================================
 // TYPES
@@ -622,6 +623,7 @@ export function getOllamaClient(config?: Partial<OllamaConfig>): OllamaClient {
 /**
  * Get AI response with full fallback chain
  * This is the recommended method for Nexik chat
+ * Includes caching for repeated queries
  */
 export async function getAIResponseWithFallback(
   messages: OllamaMessage[],
@@ -631,10 +633,30 @@ export async function getAIResponseWithFallback(
     temperature?: number
     maxTokens?: number
     ragContext?: string
+    skipCache?: boolean  // Force skip cache
   }
 ): Promise<FallbackResponse> {
+  // Check cache first (unless explicitly skipped)
+  if (!options?.skipCache) {
+    const cached = aiCache.get(messages, options?.system)
+    if (cached) {
+      return {
+        content: cached,
+        source: 'ai',  // Return as if it was AI response
+        model: 'cache'
+      }
+    }
+  }
+  
   const client = getOllamaClient()
-  return client.chatWithFallback(messages, options)
+  const response = await client.chatWithFallback(messages, options)
+  
+  // Cache successful AI responses
+  if (response.source === 'ai' || response.source === 'fallback_ai') {
+    aiCache.set(messages, options?.system, response.content)
+  }
+  
+  return response
 }
 
 export function getOllamaBaseUrl(): string {
