@@ -443,6 +443,154 @@ export async function initNexikSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_nexik_analytics_org ON nexik_analytics(org_id, period_type, period_start DESC);
     
     CREATE INDEX IF NOT EXISTS idx_nexik_rate_limits_key ON nexik_rate_limits(key, window_start);
+
+    -- =====================================================
+    -- ADVANCED FEATURES SCHEMA (v2)
+    -- =====================================================
+
+    -- Sentiment columns on messages
+    ALTER TABLE nexik_messages ADD COLUMN IF NOT EXISTS sentiment_score DECIMAL(4,2);
+    ALTER TABLE nexik_messages ADD COLUMN IF NOT EXISTS sentiment_label VARCHAR(20);
+    ALTER TABLE nexik_messages ADD COLUMN IF NOT EXISTS sentiment_data JSONB;
+    ALTER TABLE nexik_messages ADD COLUMN IF NOT EXISTS detected_language VARCHAR(10);
+    ALTER TABLE nexik_messages ADD COLUMN IF NOT EXISTS voice_message_id UUID;
+
+    -- Sentiment and language on conversations  
+    ALTER TABLE nexik_conversations ADD COLUMN IF NOT EXISTS sentiment_trend DECIMAL(4,2);
+    ALTER TABLE nexik_conversations ADD COLUMN IF NOT EXISTS priority VARCHAR(20) DEFAULT 'normal';
+    ALTER TABLE nexik_conversations ADD COLUMN IF NOT EXISTS primary_language VARCHAR(10);
+    ALTER TABLE nexik_conversations ADD COLUMN IF NOT EXISTS auto_tags TEXT[] DEFAULT '{}';
+    ALTER TABLE nexik_conversations ADD COLUMN IF NOT EXISTS detected_intent VARCHAR(50);
+    ALTER TABLE nexik_conversations ADD COLUMN IF NOT EXISTS detected_topics TEXT[] DEFAULT '{}';
+
+    -- Auto-tag rules
+    CREATE TABLE IF NOT EXISTS nexik_auto_tag_rules (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      patterns TEXT[] DEFAULT '{}',
+      keywords TEXT[] DEFAULT '{}',
+      tag VARCHAR(100) NOT NULL,
+      priority INTEGER DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Proactive messaging triggers
+    CREATE TABLE IF NOT EXISTS nexik_proactive_triggers (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      widget_id UUID REFERENCES nexik_widgets(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      trigger_type VARCHAR(50) NOT NULL,
+      conditions JSONB NOT NULL DEFAULT '{}',
+      message TEXT NOT NULL,
+      quick_replies JSONB DEFAULT '[]',
+      delay_seconds INTEGER DEFAULT 0,
+      max_shows_per_visitor INTEGER DEFAULT 1,
+      cooldown_hours INTEGER DEFAULT 24,
+      is_active BOOLEAN DEFAULT true,
+      priority INTEGER DEFAULT 0,
+      stats JSONB DEFAULT '{"shown": 0, "clicked": 0, "converted": 0}',
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Proactive messaging logs
+    CREATE TABLE IF NOT EXISTS nexik_proactive_logs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      trigger_id UUID NOT NULL REFERENCES nexik_proactive_triggers(id) ON DELETE CASCADE,
+      visitor_id VARCHAR(255) NOT NULL,
+      shown_at TIMESTAMP DEFAULT NOW(),
+      clicked_at TIMESTAMP,
+      converted_at TIMESTAMP
+    );
+
+    -- Voice messages
+    CREATE TABLE IF NOT EXISTS nexik_voice_messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      conversation_id UUID NOT NULL REFERENCES nexik_conversations(id) ON DELETE CASCADE,
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      sender_type VARCHAR(20) NOT NULL,
+      audio_url TEXT NOT NULL,
+      audio_format VARCHAR(50) NOT NULL,
+      duration_seconds INTEGER,
+      transcription TEXT,
+      transcription_confidence DECIMAL(3,2),
+      detected_language VARCHAR(10),
+      status VARCHAR(50) DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Custom AI models (LoRA)
+    CREATE TABLE IF NOT EXISTS nexik_custom_models (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      base_model VARCHAR(100) NOT NULL,
+      adapter_path TEXT,
+      status VARCHAR(50) DEFAULT 'pending',
+      training_started_at TIMESTAMP,
+      training_completed_at TIMESTAMP,
+      metrics JSONB DEFAULT '{"samples_used": 0, "epochs": 0}',
+      is_active BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Training jobs
+    CREATE TABLE IF NOT EXISTS nexik_training_jobs (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      model_id UUID NOT NULL REFERENCES nexik_custom_models(id) ON DELETE CASCADE,
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      status VARCHAR(50) DEFAULT 'queued',
+      progress INTEGER DEFAULT 0,
+      current_epoch INTEGER,
+      current_loss DECIMAL(10,6),
+      config JSONB,
+      training_data_count INTEGER,
+      started_at TIMESTAMP,
+      completed_at TIMESTAMP,
+      error TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Training data (conversation exports)
+    CREATE TABLE IF NOT EXISTS nexik_training_data (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      conversation_id UUID NOT NULL REFERENCES nexik_conversations(id) ON DELETE CASCADE,
+      messages JSONB NOT NULL,
+      quality_score DECIMAL(3,2) NOT NULL,
+      included_in_training BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(org_id, conversation_id)
+    );
+
+    -- A/B test results for custom models
+    CREATE TABLE IF NOT EXISTS nexik_ab_test_results (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      model_id UUID REFERENCES nexik_custom_models(id) ON DELETE SET NULL,
+      is_custom BOOLEAN NOT NULL,
+      response_time_ms INTEGER,
+      rating INTEGER,
+      resolved BOOLEAN,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- =====================================================
+    -- ADDITIONAL INDEXES (v2)
+    -- =====================================================
+
+    CREATE INDEX IF NOT EXISTS idx_nexik_messages_sentiment ON nexik_messages(conversation_id, sentiment_label);
+    CREATE INDEX IF NOT EXISTS idx_nexik_conversations_priority ON nexik_conversations(org_id, priority);
+    CREATE INDEX IF NOT EXISTS idx_nexik_conversations_language ON nexik_conversations(org_id, primary_language);
+    CREATE INDEX IF NOT EXISTS idx_nexik_auto_tag_rules_org ON nexik_auto_tag_rules(org_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_proactive_triggers_org ON nexik_proactive_triggers(org_id, is_active);
+    CREATE INDEX IF NOT EXISTS idx_nexik_proactive_logs_visitor ON nexik_proactive_logs(visitor_id, shown_at);
+    CREATE INDEX IF NOT EXISTS idx_nexik_voice_messages_convo ON nexik_voice_messages(conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_custom_models_org ON nexik_custom_models(org_id, is_active);
+    CREATE INDEX IF NOT EXISTS idx_nexik_training_jobs_model ON nexik_training_jobs(model_id, status);
+    CREATE INDEX IF NOT EXISTS idx_nexik_ab_test_results_org ON nexik_ab_test_results(org_id, created_at);
   `)
   // Database schema initialized
 }

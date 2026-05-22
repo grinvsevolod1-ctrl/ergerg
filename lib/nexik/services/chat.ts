@@ -24,6 +24,11 @@ import {
   notifyOperatorRequest 
 } from './telegram'
 import { pushEvent } from '@/app/api/nexik/events/route'
+// Advanced features
+import { analyzeAndUpdateSentiment, type SentimentResult } from './sentiment'
+import { detectAndUpdateLanguage, getLanguagePromptModifier, type LanguageDetectionResult } from './language'
+import { autoTag, updateConversationTags } from './tagging'
+import { getActiveModel } from './training'
 
 // Schedule types
 interface Schedule {
@@ -120,6 +125,8 @@ export interface ChatResponse {
   message: Message
   ai_response?: Message
   quota_remaining?: number
+  sentiment?: SentimentResult
+  language?: LanguageDetectionResult
 }
 
 export async function processMessage(request: ChatRequest): Promise<ChatResponse> {
@@ -145,6 +152,47 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
     sender_type: 'visitor',
     content: request.message
   })
+
+  // === ADVANCED FEATURES ===
+  
+  // 1. Detect language
+  const languageResult = await detectAndUpdateLanguage(
+    visitorMessage.id,
+    conversation.id,
+    request.message
+  )
+  
+  // 2. Analyze sentiment
+  const sentimentResult = await analyzeAndUpdateSentiment(
+    visitorMessage.id,
+    conversation.id,
+    request.message
+  )
+  
+  // 3. Auto-tag conversation
+  const taggingResult = await autoTag(request.message, request.org_id)
+  if (taggingResult.suggestedTags.length > 0) {
+    await updateConversationTags(
+      conversation.id,
+      taggingResult.suggestedTags,
+      taggingResult.intent,
+      taggingResult.topics
+    )
+  }
+  
+  // 4. Check if urgent sentiment requires operator notification
+  if (sentimentResult.conversation.priority === 'urgent' || sentimentResult.conversation.priority === 'high') {
+    const telegramConfig = await getOrgTelegramConfig(request.org_id)
+    if (telegramConfig) {
+      await notifyOperatorRequest(telegramConfig, {
+        conversationId: conversation.id,
+        reason: sentimentResult.conversation.escalationReason || 'High priority conversation',
+        visitorName: request.visitor_info?.name,
+        lastMessage: request.message,
+        dashboardUrl: process.env.NEXT_PUBLIC_BASE_URL || 'https://nexik.org/nexik/dashboard'
+      })
+    }
+  }
 
   // Check message quota
   const quotaCheck = await checkMessageLimit(request.org_id)
@@ -237,7 +285,8 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
         request.message,
         widget,
         request.org_id,
-        startTime
+        startTime,
+        languageResult.language
       )
       
       // Increment usage
@@ -262,7 +311,9 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
     conversation_id: conversation.id,
     message: visitorMessage,
     ai_response: aiResponse,
-    quota_remaining: quotaCheck.remaining
+    quota_remaining: quotaCheck.remaining,
+    sentiment: sentimentResult.message,
+    language: languageResult
   }
 }
 
@@ -271,16 +322,27 @@ async function generateAIResponse(
   userMessage: string,
   widget: Widget | null,
   orgId: string,
-  startTime: number
+  startTime: number,
+  detectedLanguage?: string
 ): Promise<Message> {
   const config = getConfig()
+  
+  // Check for custom trained model
+  const customModel = await getActiveModel(orgId)
+  const modelToUse = customModel?.adapter_path || widget?.ai_model || config.model
   
   // Get RAG context
   const ragContext = await getRAGContextForPrompt(orgId, userMessage, 3)
   const ragUsed = !!ragContext
   
-  // Build system prompt
-  const systemPrompt = buildSystemPrompt(widget, ragContext)
+  // Build system prompt with language modifier
+  let systemPrompt = buildSystemPrompt(widget, ragContext)
+  if (detectedLanguage) {
+    const langModifier = getLanguagePromptModifier(detectedLanguage as Parameters<typeof getLanguagePromptModifier>[0])
+    if (langModifier) {
+      systemPrompt = `${langModifier}\n\n${systemPrompt}`
+    }
+  }
   
   // Get conversation history (last 10 messages for context)
   const history = await getConversationHistory(conversation.id, 10)
@@ -294,7 +356,7 @@ async function generateAIResponse(
   
   // Call AI with fallback chain (tries multiple models, then rule-based, then graceful degradation)
   const aiResponse = await getAIResponseWithFallback(messages, {
-    model: widget?.ai_model || config.model,
+    model: modelToUse,
     system: systemPrompt,
     temperature: widget?.ai_temperature || config.temperature,
     maxTokens: widget?.ai_max_tokens || config.maxTokens,
