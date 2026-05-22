@@ -636,3 +636,7 @@ export async function getAIResponseWithFallback(
   const client = getOllamaClient()
   return client.chatWithFallback(messages, options)
 }
+
+export function getOllamaBaseUrl(): string {
+  return process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+}
