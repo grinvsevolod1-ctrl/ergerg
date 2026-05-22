@@ -8,6 +8,17 @@ import { Send, ArrowRight, Check, Loader2, Globe, Copy, X, Sparkles, MessageCirc
 import { cn } from "@/lib/utils"
 import { SiriOrb } from "@/components/nexik/siri-orb"
 import { SiriOrb as NetNextSiriOrb } from "@/components/ai-orb"
+import {
+  getOrCreateVisitor,
+  getCurrentConversation,
+  addMessage as addMemoryMessage,
+  getConversationHistory,
+  updateBusinessContext,
+  updateStage,
+  getBusinessContext,
+  updateVisitor,
+  NexikMessage,
+} from "@/lib/nexik/services/unified-memory"
 
 type Step = "chat" | "platforms" | "offer" | "netnext-chat" | "register" | "done"
 
@@ -78,9 +89,7 @@ async function analyzeInputWithAI(input: string, conversationHistory: Array<{rol
 export default function NexikStartPage() {
   const router = useRouter()
   const [step, setStep] = useState<Step>("chat")
-  const [messages, setMessages] = useState<Message[]>([
-    { id: "1", role: "assistant", content: "Привет! Я Nexik - AI-помощник для бизнеса. Расскажи, чем занимаешься? Или спроси что-нибудь обо мне." }
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const [isThinking, setIsThinking] = useState(false)
@@ -95,6 +104,57 @@ export default function NexikStartPage() {
   const [businessDesc, setBusinessDesc] = useState("")
   const [userName, setUserName] = useState("")
   const [userPhone, setUserPhone] = useState("")
+  
+  // Load conversation from unified memory on mount
+  useEffect(() => {
+    const conv = getCurrentConversation('start')
+    const visitor = getOrCreateVisitor()
+    
+    // Pre-fill name if we have it
+    if (visitor.name) {
+      setUserName(visitor.name)
+    }
+    if (visitor.email) {
+      setEmail(visitor.email)
+    }
+    if (visitor.businessDescription) {
+      setBusinessDesc(visitor.businessDescription)
+    }
+    
+    // If we have conversation history from homepage, continue it
+    if (conv.messages.length > 0) {
+      // Convert NexikMessages to local Message format
+      const localMessages: Message[] = conv.messages.map(m => ({
+        id: m.id,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }))
+      setMessages(localMessages)
+      
+      // If business was already described, skip to next step or show welcome back
+      if (visitor.businessType && conv.stage !== 'greeting') {
+        // Add welcome back message
+        const welcomeBack: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `Рад видеть тебя снова! Мы уже обсуждали твой бизнес (${visitor.businessType}). Продолжим настройку?`,
+          buttons: [
+            { label: 'Да, продолжим', action: 'continue' },
+            { label: 'Начать заново', action: 'restart' },
+          ]
+        }
+        setMessages(prev => [...prev, welcomeBack])
+      }
+    } else {
+      // No history - show personalized welcome
+      const welcomeContent = visitor.name 
+        ? `С возвращением, ${visitor.name}! Я Nexik - AI-помощник для бизнеса. Расскажи, чем занимаешься?`
+        : `Привет! Я Nexik - AI-помощник для бизнеса. Расскажи, чем занимаешься? Или спроси что-нибудь обо мне.`
+      
+      setMessages([{ id: "1", role: "assistant", content: welcomeContent }])
+      addMemoryMessage('assistant', welcomeContent)
+    }
+  }, [])
   
   // Platforms selection
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
@@ -183,64 +243,81 @@ export default function NexikStartPage() {
     setMessages(prev => [...prev, userMsg])
     setInput("")
     
-    // Показываем "думает"
+    // Save to unified memory
+    addMemoryMessage('user', input)
+    
+    // Show "thinking"
     setIsThinking(true)
     
     try {
-      // Собираем историю для контекста
-      const history = messages.map(m => ({ role: m.role, content: m.content }))
+      // Get history from unified memory for context
+      const history = getConversationHistory(10)
+      const businessCtx = getBusinessContext()
       
-      // Анализируем ввод через AI с историей
+      // Analyze input through AI with history and context
       const analysis = await analyzeInputWithAI(userMsg.content, history)
       
       setIsThinking(false)
       setIsTyping(true)
       
-      // Небольшая задержка для эффекта печати
+      // Small delay for typing effect
       await new Promise(r => setTimeout(r, 800))
       
       if (analysis.isValidBusiness) {
-        // Валидный бизнес - сохраняем и идём дальше
+        // Valid business - save to memory and continue
         setBusinessDesc(analysis.businessType || userMsg.content)
         
-        setMessages(prev => [...prev, {
+        // Update unified memory with business context
+        updateBusinessContext({
+          type: analysis.businessType || 'other',
+          description: userMsg.content,
+        })
+        updateStage('discovery')
+        
+        const assistantMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content: analysis.response
-        }])
+        }
+        setMessages(prev => [...prev, assistantMsg])
+        addMemoryMessage('assistant', analysis.response)
         setIsTyping(false)
         
-        // Переходим к выбору платформ
+        // Move to platforms step
         setTimeout(() => {
           setStep("platforms")
         }, 1500)
       } else {
-        // Невалидный ввод - просим уточнить
+        // Invalid input - ask for clarification
         let response = analysis.response
         
-        // Предлагаем микрофон если поддерживается
+        // Suggest microphone if supported
         if (voiceSupported) {
           response += "\n\nИли нажми на микрофон и просто расскажи голосом!"
         }
         
-        setMessages(prev => [...prev, {
+        const assistantMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content: response
-        }])
+        }
+        setMessages(prev => [...prev, assistantMsg])
+        addMemoryMessage('assistant', response)
         setIsTyping(false)
       }
     } catch {
       setIsThinking(false)
       setIsTyping(false)
       
-      setMessages(prev => [...prev, {
+      const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content: "Произошла ошибка. Попробуй ещё раз - расскажи о своём бизнесе."
-      }])
+      }
+      setMessages(prev => [...prev, errorMsg])
+      addMemoryMessage('assistant', errorMsg.content)
     }
-  }, [input, isTyping, isThinking, voiceSupported])
+  }, [input, isTyping, isThinking, voiceSupported, messages])
 
   // Выбор платформы
   const togglePlatform = useCallback((platformId: string) => {
@@ -252,8 +329,11 @@ export default function NexikStartPage() {
   }, [])
 
   const handlePlatformsSubmit = useCallback(() => {
-    if (selectedPlatforms.length === 0) {
-      // Если ничего не выбрано, всё равно продолжаем
+    // Save platforms to unified memory
+    if (selectedPlatforms.length > 0) {
+      updateBusinessContext({
+        platforms: selectedPlatforms,
+      })
     }
     setStep("offer")
   }, [selectedPlatforms])

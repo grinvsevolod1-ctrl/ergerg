@@ -2,6 +2,7 @@
 
 // Chat component v2
 import { useState, useEffect, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { CookieConsent } from "@/components/cookie-consent"
 import { HeroSection } from "@/components/sections/hero-section"
@@ -14,9 +15,10 @@ import { ContactSection } from "@/components/sections/contact-section"
 import { Footer } from "@/components/footer"
 import { FloatingCTA } from "@/components/floating-cta"
 import { AIOrbCanvas } from "@/components/ai-orb"
-import { Chat } from "@/components/chat"
+import { NexikDemoChat } from "@/components/nexik/demo-chat"
 
 export default function Home() {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isOrbMinimized, setIsOrbMinimized] = useState(false)
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -35,6 +37,12 @@ export default function Home() {
   const handleOrbClick = useCallback(() => {
     setIsChatOpen(prev => !prev)
   }, [])
+  
+  const handleStartOnboarding = useCallback(() => {
+    // Close chat and navigate to /start
+    setIsChatOpen(false)
+    router.push('/nexik/start')
+  }, [router])
 
   const handleNavigate = useCallback((section: string) => {
     setActiveSection(section)
@@ -82,10 +90,11 @@ export default function Home() {
         isChatOpen={isChatOpen}
       />
 
-      {/* Chat uses LOCAL_CHAT_CONFIG by default - no registration needed */}
-      <Chat
+      {/* Nexik Demo Chat - умный чат с памятью */}
+      <NexikDemoChat
         isOpen={isChatOpen}
         onOpenChange={setIsChatOpen}
+        onStartOnboarding={handleStartOnboarding}
       />
 
       {showContent && (
