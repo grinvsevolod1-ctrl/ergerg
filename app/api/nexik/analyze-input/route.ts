@@ -125,42 +125,71 @@ export async function POST(request: NextRequest) {
       const classification = classifyBusiness(input)
       
       if (classification.isValidBusiness && classification.confidence >= 0.5) {
-        // Use AI to generate natural response about their business
-        const aiResult = await routedChat(
-          'chat',
-          [{ role: 'user', content: input }],
-          {
-            model: AI_SERVERS.quality.defaultModel,
-            system: `${NEXIK_PERSONA}
+        // Use FAST server with 3b model for quick responses (not 32b which is too slow)
+        try {
+          const controller = new AbortController()
+          const timeout = setTimeout(() => controller.abort(), 15000) // 15s timeout
+          
+          const aiResult = await routedChat(
+            'simple', // Use FAST server
+            [{ role: 'user', content: input }],
+            {
+              model: AI_SERVERS.fast.complexModel, // qwen2.5:3b - fast but decent
+              system: `${NEXIK_PERSONA}
 
 Человек описал свой бизнес: "${input}"
 Тип бизнеса: ${classification.businessType}
 
 Твоя задача: 
 1. Подтвердить что понял их бизнес
-2. Сказать что-то позитивное/интересное про эту нишу  
-3. Коротко (1-2 предложения) спросить уточняющий вопрос о их бизнесе
+2. Сказать что-то позитивное про эту нишу  
+3. Коротко спросить уточняющий вопрос
 
-Отвечай живо и дружелюбно, без шаблонов. Максимум 2-3 предложения.`,
-            temperature: 0.7,
-            maxTokens: 200
+Отвечай живо и дружелюбно. Максимум 2-3 предложения.`,
+              temperature: 0.7,
+              maxTokens: 150
+            }
+          )
+          
+          clearTimeout(timeout)
+          
+          return NextResponse.json({
+            isValidBusiness: true,
+            businessType: classification.businessType,
+            response: aiResult.response,
+            intent,
+            source: 'ai_fast',
+            timeMs: Date.now() - startTime
+          })
+        } catch {
+          // AI timeout - use template response
+          const templates: Record<string, string> = {
+            'auto': `Автосервис - отличная ниша! Я могу записывать клиентов на ТО, отвечать о ценах и наличии запчастей 24/7. Сколько у вас мастеров работает?`,
+            'beauty': `Салон красоты - прекрасно! Я могу записывать клиентов к мастерам, напоминать о визитах и отвечать о ваших услугах. Какие услуги самые популярные?`,
+            'food': `Еда - это всегда актуально! Могу принимать заказы, отвечать о меню и времени доставки. Это доставка или кафе/ресторан?`,
+            'services': `Понял, сфера услуг. Я могу записывать клиентов, отвечать на вопросы о ценах и сроках. Расскажи подробнее - какие именно услуги?`,
+            'retail': `Магазин - отлично! Могу консультировать по товарам, помогать с выбором и оформлять заказы. Что продаёте?`,
+            'default': `Интересно! Расскажи подробнее - чем именно занимаешься? Так я смогу лучше понять как тебе помочь.`
           }
-        )
-        
-        return NextResponse.json({
-          isValidBusiness: true,
-          businessType: classification.businessType,
-          response: aiResult.response,
-          intent,
-          source: 'ai_quality',
-          timeMs: Date.now() - startTime
-        })
+          
+          const type = classification.businessType || 'default'
+          const response = templates[type] || templates['default']
+          
+          return NextResponse.json({
+            isValidBusiness: true,
+            businessType: classification.businessType,
+            response,
+            intent,
+            source: 'template_fallback',
+            timeMs: Date.now() - startTime
+          })
+        }
       }
     }
     
-    // For all other intents, use AI for natural conversation
+    // For all other intents, use FAST AI with timeout for natural conversation
     const messages = [
-      ...conversationHistory.slice(-6), // Last 6 messages for context
+      ...conversationHistory.slice(-4), // Last 4 messages for context
       { role: 'user' as const, content: input }
     ]
     
@@ -208,28 +237,55 @@ export async function POST(request: NextRequest) {
         break
     }
     
-    const aiResult = await routedChat(
-      'chat',
-      messages,
-      {
-        model: AI_SERVERS.quality.defaultModel,
-        system: NEXIK_PERSONA + systemAddition,
-        temperature: 0.7,
-        maxTokens: 250
+    // Use FAST server with timeout
+    try {
+      const aiResult = await Promise.race([
+        routedChat(
+          'simple', // FAST server
+          messages,
+          {
+            model: AI_SERVERS.fast.complexModel, // qwen2.5:3b
+            system: NEXIK_PERSONA + systemAddition,
+            temperature: 0.7,
+            maxTokens: 150
+          }
+        ),
+        // Timeout after 10 seconds
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('timeout')), 10000)
+        )
+      ])
+      
+      // Check if AI response contains business classification
+      const classification = classifyBusiness(input)
+      
+      return NextResponse.json({
+        isValidBusiness: classification.isValidBusiness && classification.confidence >= 0.5,
+        businessType: classification.businessType,
+        response: aiResult.response,
+        intent,
+        source: 'ai_fast',
+        timeMs: Date.now() - startTime
+      })
+    } catch {
+      // Timeout or error - use fallback responses
+      const fallbacks: Record<string, string> = {
+        'greeting': 'Привет! Я Nexik, AI-помощник для бизнеса. Расскажи, чем занимаешься?',
+        'about_nexik': 'Я Nexik - AI-ассистент. Умею общаться с клиентами, отвечать на вопросы, собирать заявки и работаю 24/7. Какой у тебя бизнес?',
+        'rude': 'Ладно, проехали. Так какой у тебя бизнес? Может чем помогу.',
+        'off_topic': 'Хороший вопрос, но я больше по бизнесу. Расскажи чем занимаешься?',
+        'unclear': 'Не совсем понял. Расскажи какой у тебя бизнес или спроси что я умею!'
       }
-    )
-    
-    // Check if AI response contains business classification
-    const classification = classifyBusiness(input)
-    
-    return NextResponse.json({
-      isValidBusiness: classification.isValidBusiness && classification.confidence >= 0.5,
-      businessType: classification.businessType,
-      response: aiResult.response,
-      intent,
-      source: 'ai_quality',
-      timeMs: Date.now() - startTime
-    })
+      
+      return NextResponse.json({
+        isValidBusiness: false,
+        businessType: null,
+        response: fallbacks[intent] || fallbacks['unclear'],
+        intent,
+        source: 'fallback',
+        timeMs: Date.now() - startTime
+      })
+    }
 
   } catch (error) {
     console.error('[Analyze Input] Error:', error)
