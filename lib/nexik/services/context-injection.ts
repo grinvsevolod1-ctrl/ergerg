@@ -125,7 +125,7 @@ export async function buildContext(
   const [personality, memoryContext, knowledgeResults] = await Promise.all([
     getOrgPersonality(orgId),
     includeMemory ? getMemoryContext(orgId, visitorId) : null,
-    includeKnowledge ? searchKnowledge(orgId, currentMessage, conversationHistory, maxKnowledgeChunks) : []
+    includeKnowledge ? searchKnowledgeWithContext(orgId, currentMessage, conversationHistory, maxKnowledgeChunks) : []
   ])
   
   // Build personality prompt
@@ -285,12 +285,12 @@ function buildPageContextPrompt(pageContext: NonNullable<ContextOptions['pageCon
 /**
  * Search knowledge base with conversation context
  */
-async function searchKnowledge(
+async function searchKnowledgeWithContext(
   orgId: string,
   currentMessage: string,
   history: ConversationMessage[],
   maxChunks: number
-): Promise<KnowledgeSearchResult[]> {
+): Promise<KnowledgeChunk[]> {
   // Build search query from current message + recent context
   const recentUserMessages = history
     .filter(m => m.role === 'user')
