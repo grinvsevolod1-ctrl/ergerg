@@ -30,10 +30,10 @@ import { detectAndUpdateLanguage, getLanguagePromptModifier, type LanguageDetect
 import { autoTag, updateConversationTags } from './tagging'
 import { getActiveModel } from './training'
 // Human-like AI features
-import { getVisitorMemory, updateMemoryFromMessage, generatePersonalizedGreeting } from './memory'
-import { getPersonality, humanizeResponse, DEFAULT_PERSONALITY } from './personality'
-import { buildEnhancedContext, buildHumanBehaviorInstructions } from './context-injection'
-import { recordInteraction, recordCorrection } from './feedback-loop'
+import { getOrCreateVisitorMemory, updateVisitorMemory, getMemoryContext, extractFactsFromMessage } from './memory'
+import { getOrgPersonality, humanizeResponse, DEFAULT_PERSONALITY } from './personality'
+import { buildContext } from './context-injection'
+import { recordMessageFeedback, recordOperatorCorrection } from './feedback-loop'
 import { routedChat, AI_SERVERS } from '@/lib/ai/router'
 
 // Schedule types
@@ -201,18 +201,18 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
   }
 
   // 5. Update visitor memory with extracted info
-  await updateMemoryFromMessage(
-    request.org_id,
-    request.visitor_id,
-    request.message,
-    {
-      name: request.visitor_info?.name,
-      email: request.visitor_info?.email,
-      phone: request.visitor_info?.phone,
-      pageUrl: request.page_url,
-      sentiment: sentimentResult.message.label
-    }
-  )
+  const memory = await getOrCreateVisitorMemory(request.org_id, request.visitor_id)
+  
+  // Extract facts from message and update memory
+  const extractedFacts = await extractFactsFromMessage(request.message)
+  if (extractedFacts.length > 0 || request.visitor_info?.name || request.visitor_info?.email) {
+    await updateVisitorMemory(memory.id, {
+      name: request.visitor_info?.name || memory.name,
+      email: request.visitor_info?.email || memory.email,
+      phone: request.visitor_info?.phone || memory.phone,
+      last_sentiment: sentimentResult.message.label
+    })
+  }
 
   // Check message quota
   const quotaCheck = await checkMessageLimit(request.org_id)
@@ -354,40 +354,31 @@ async function generateAIResponse(
   const modelToUse = customModel?.adapter_path || widget?.ai_model || config.model
   
   // Get visitor memory for personalization
-  const memory = visitorId ? await getVisitorMemory(orgId, visitorId) : null
+  const memory = visitorId ? await getOrCreateVisitorMemory(orgId, visitorId) : null
   
   // Get organization personality
-  const personality = await getPersonality(orgId) || DEFAULT_PERSONALITY
+  const personality = await getOrgPersonality(orgId)
   
   // Get RAG context
   const ragContext = await getRAGContextForPrompt(orgId, userMessage, 3)
   const ragUsed = !!ragContext
   
-  // Build enhanced context with memory, personality, and RAG
-  const enhancedContext = await buildEnhancedContext({
+  // Build context using context-injection
+  const injectedContext = await buildContext({
     orgId,
     visitorId: visitorId || conversation.visitor_id,
     currentMessage: userMessage,
-    conversationId: conversation.id,
-    widget: widget || undefined,
-    pageUrl: undefined,
-    pageTitle: undefined
+    includeMemory: true,
+    includeKnowledge: true,
+    includePersonality: true
   })
   
-  // Build system prompt with human behavior instructions
-  let systemPrompt = widget?.system_prompt || `Ты — AI-ассистент. Отвечай вежливо и профессионально.`
+  // Use the full system prompt from context injection
+  let systemPrompt = injectedContext.fullSystemPrompt
   
-  // Add human behavior instructions
-  systemPrompt = buildHumanBehaviorInstructions(personality) + '\n\n' + systemPrompt
-  
-  // Add memory context if available
-  if (enhancedContext.memoryContext) {
-    systemPrompt += `\n\n=== ПАМЯТЬ О КЛИЕНТЕ ===\n${enhancedContext.memoryContext}`
-  }
-  
-  // Add RAG context
-  if (ragContext) {
-    systemPrompt += `\n\n=== БАЗА ЗНАНИЙ ===\n${ragContext}\n\nИспользуй информацию из базы знаний для ответа.`
+  // Override with widget's custom prompt if provided
+  if (widget?.system_prompt) {
+    systemPrompt = widget.system_prompt + '\n\n' + injectedContext.personalityPrompt
   }
   
   // Add language modifier
@@ -448,18 +439,8 @@ async function generateAIResponse(
     quick_replies: quickReplies
   })
   
-  // Record for feedback system (for future training)
-  if (senderType === 'ai') {
-    await recordInteraction(
-      orgId,
-      conversation.id,
-      savedMessage.id,
-      userMessage,
-      finalContent,
-      aiResult.model || modelToUse,
-      ragUsed
-    ).catch(() => {}) // Don't fail if feedback recording fails
-  }
+  // Feedback is recorded when user rates the message via API
+  // No automatic recording here
   
   return savedMessage
 }

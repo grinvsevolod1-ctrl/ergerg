@@ -5,7 +5,7 @@
 
 import { getMemoryContext, type MemoryContext } from './memory'
 import { getOrgPersonality, buildPersonalityPrompt, type Personality } from './personality'
-import { getRelevantKnowledge, type KnowledgeSearchResult } from '../db/knowledge'
+import { searchKnowledge, type KnowledgeChunk } from '../db/knowledge'
 import { query } from '@/lib/db'
 
 // ============================================================
@@ -300,7 +300,7 @@ async function searchKnowledge(
   const searchQuery = [currentMessage, ...recentUserMessages].join(' ')
   
   try {
-    return await getRelevantKnowledge(orgId, searchQuery, maxChunks)
+    return await searchKnowledge(orgId, searchQuery, maxChunks)
   } catch (error) {
     console.error('[Context] Knowledge search failed:', error)
     return []
@@ -394,7 +394,7 @@ export async function buildKnowledgeOnlyContext(
 ): Promise<string> {
   const [personality, knowledge] = await Promise.all([
     getOrgPersonality(orgId),
-    getRelevantKnowledge(orgId, currentMessage, maxChunks)
+    searchKnowledge(orgId, currentMessage, maxChunks)
   ])
   
   return [
