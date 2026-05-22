@@ -1,7 +1,7 @@
 /**
  * Nexik AI Router - Dual Server Architecture
  * 
- * FAST server (5.35.80.242): qwen2.5:1.5b, qwen2.5:3b - for simple tasks
+ * FAST server (2.26.75.147): qwen2.5:1.5b, qwen2.5:3b - for simple tasks
  * QUALITY server (31.76.93.2): qwen2.5:7b - for complex tasks
  */
 
@@ -11,7 +11,7 @@ import { getConfig } from './config'
 export const AI_SERVERS = {
   fast: {
     name: 'FAST',
-    url: process.env.OLLAMA_FAST_URL || 'http://5.35.80.242:11434',
+    url: process.env.OLLAMA_FAST_URL || 'http://2.26.75.147:11434',
     models: ['qwen2.5:1.5b', 'qwen2.5:3b'],
     defaultModel: 'qwen2.5:1.5b',
     complexModel: 'qwen2.5:3b',
