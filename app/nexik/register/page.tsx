@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
@@ -32,7 +32,17 @@ function YandexIcon({ className }: { className?: string }) {
   )
 }
 
-export default function NexikRegisterPage() {
+// Loading fallback
+function RegisterLoading() {
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+    </div>
+  )
+}
+
+// Main content component that uses useSearchParams
+function RegisterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [step, setStep] = useState<AuthStep>("method")
@@ -657,5 +667,14 @@ export default function NexikRegisterPage() {
         )}
       </motion.div>
     </div>
+  )
+}
+
+// Main page component with Suspense boundary
+export default function NexikRegisterPage() {
+  return (
+    <Suspense fallback={<RegisterLoading />}>
+      <RegisterContent />
+    </Suspense>
   )
 }
