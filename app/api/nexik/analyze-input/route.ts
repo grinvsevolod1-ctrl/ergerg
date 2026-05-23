@@ -174,10 +174,10 @@ export async function POST(request: NextRequest) {
     // Generate visitor context for prompt
     const visitorContext = await generateVisitorContext(visitorId)
 
-    // Build conversation history for AI
+    // Build conversation history for AI - include full context
     const historyForAI = recentMessages.length > 0 
-      ? recentMessages.map(m => ({ role: m.role, content: m.content }))
-      : conversationHistory.slice(-6)
+      ? recentMessages.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+      : conversationHistory.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
     
     // Build system prompt with visitor context
     const systemPrompt = buildNexikPrompt({
@@ -260,7 +260,17 @@ export async function POST(request: NextRequest) {
     // Get training examples for this intent
     const trainingExamples = await getTrainingExamples(intent)
     
-    const fullPrompt = systemPrompt + '\n\n=== ТЕКУЩАЯ ЗАДАЧА ===\n' + intentGuidance + trainingExamples
+    // Build conversation context summary
+    let conversationContext = ''
+    if (historyForAI.length > 0) {
+      conversationContext = '\n\n=== КОНТЕКСТ РАЗГОВОРА ===\n'
+      for (const msg of historyForAI.slice(-6)) {
+        conversationContext += `${msg.role === 'user' ? 'Юзер' : 'Ты'}: ${msg.content}\n`
+      }
+      conversationContext += '\n(Учитывай этот контекст в своём ответе!)\n'
+    }
+    
+    const fullPrompt = systemPrompt + conversationContext + '\n\n=== ТЕКУЩАЯ ЗАДАЧА ===\n' + intentGuidance + trainingExamples
     
     // Call AI with timeout
     try {
@@ -279,7 +289,7 @@ export async function POST(request: NextRequest) {
           }
         ),
         new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('timeout')), 12000)
+          setTimeout(() => reject(new Error('timeout')), 20000)
         )
       ])
       

@@ -167,6 +167,17 @@ function ChatDemo({ visible }: { visible: boolean }) {
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const [isListening, setIsListening] = useState(false)
+  const [visitorId] = useState(() => {
+    // Generate or get visitor ID from localStorage
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('nexik_visitor_id')
+      if (stored) return stored
+      const newId = `v_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+      localStorage.setItem('nexik_visitor_id', newId)
+      return newId
+    }
+    return `v_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  })
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isFirstRender = useRef(true)
 
@@ -223,12 +234,13 @@ function ChatDemo({ visible }: { visible: boolean }) {
     setIsTyping(true)
 
     try {
-      // Call AI API
+      // Call AI API with visitorId for memory
       const response = await fetch('/api/nexik/analyze-input', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           input: userMsg.content,
+          visitorId,
           conversationHistory: messages.map(m => ({ role: m.role, content: m.content }))
         })
       })
@@ -258,6 +270,7 @@ function ChatDemo({ visible }: { visible: boolean }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           input: userMsg.content,
+          visitorId,
           conversationHistory: messages.map(m => ({ role: m.role, content: m.content }))
         })
       })
