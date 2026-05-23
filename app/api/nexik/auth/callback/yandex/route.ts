@@ -125,10 +125,10 @@ export async function GET(request: NextRequest) {
       const displayName = yandexUser.real_name || yandexUser.display_name || yandexUser.login
       
       const orgResult = await query<{ id: string; name: string }>(
-        `INSERT INTO nexik_organizations (id, name, plan, created_at) 
-         VALUES (gen_random_uuid(), $1, 'free', NOW()) 
+        `INSERT INTO nexik_organizations (id, name, owner_email, plan, created_at) 
+         VALUES (gen_random_uuid(), $1, $2, 'free', NOW()) 
          RETURNING id, name`,
-        [displayName]
+        [displayName, email.toLowerCase()]
       )
       org = orgResult[0]
       

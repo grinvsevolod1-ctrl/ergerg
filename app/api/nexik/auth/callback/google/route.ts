@@ -118,10 +118,10 @@ export async function GET(request: NextRequest) {
     } else {
       // New user - create org and member
       const orgResult = await query<{ id: string; name: string }>(
-        `INSERT INTO nexik_organizations (id, name, plan, created_at) 
-         VALUES (gen_random_uuid(), $1, 'free', NOW()) 
+        `INSERT INTO nexik_organizations (id, name, owner_email, plan, created_at) 
+         VALUES (gen_random_uuid(), $1, $2, 'free', NOW()) 
          RETURNING id, name`,
-        [googleUser.name || `Организация ${googleUser.email.split('@')[0]}`]
+        [googleUser.name || `Организация ${googleUser.email.split('@')[0]}`, googleUser.email.toLowerCase()]
       )
       org = orgResult[0]
       
