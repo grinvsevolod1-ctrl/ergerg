@@ -335,7 +335,14 @@ export default function NexikStartPage() {
         platforms: selectedPlatforms,
       })
     }
-    setStep("offer")
+    
+    // Check if user selected "website" - only then show offer
+    if (selectedPlatforms.includes("website")) {
+      setStep("offer")
+    } else {
+      // For messenger platforms (Instagram, Telegram, etc) - go to register
+      setStep("register")
+    }
   }, [selectedPlatforms])
 
   // Открыть чат с NetNext AI

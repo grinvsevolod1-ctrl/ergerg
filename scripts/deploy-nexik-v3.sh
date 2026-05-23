@@ -128,6 +128,31 @@ CREATE TABLE IF NOT EXISTS netnext_chat_feedback (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- OTP коды для авторизации
+CREATE TABLE IF NOT EXISTS nexik_otp_codes (
+  email TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  attempts INT DEFAULT 0,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- OAuth колонки для членов организации
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'nexik_org_members' AND column_name = 'google_id') THEN
+    ALTER TABLE nexik_org_members ADD COLUMN google_id TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'nexik_org_members' AND column_name = 'yandex_id') THEN
+    ALTER TABLE nexik_org_members ADD COLUMN yandex_id TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'nexik_org_members' AND column_name = 'avatar_url') THEN
+    ALTER TABLE nexik_org_members ADD COLUMN avatar_url TEXT;
+  END IF;
+END $$;
+
 -- Индексы для быстрого поиска
 CREATE INDEX IF NOT EXISTS idx_nexik_messages_visitor ON nexik_messages(visitor_id);
 CREATE INDEX IF NOT EXISTS idx_nexik_messages_created ON nexik_messages(created_at DESC);
