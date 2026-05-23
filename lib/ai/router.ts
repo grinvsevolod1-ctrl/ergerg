@@ -8,27 +8,31 @@
 import { getConfig } from './config'
 
 // Server configuration
+// FAST - единственный рабочий сервер для real-time (CPU 11GB RAM)
+// QUALITY - слишком медленный на CPU, используем только для фоновых задач
 export const AI_SERVERS = {
   fast: {
     name: 'FAST',
     url: process.env.OLLAMA_FAST_URL || 'http://2.26.75.147:11434',
     models: ['qwen2.5:1.5b', 'qwen2.5:3b'],
-    defaultModel: 'qwen2.5:1.5b',
+    defaultModel: 'qwen2.5:3b',      // 3B как основная - 2-4 сек
     complexModel: 'qwen2.5:3b',
-    tasks: ['classify', 'sentiment', 'language', 'tagging', 'simple', 'analyze'],
-    maxTokens: 256,
-    timeout: 30000,
+    simpleModel: 'qwen2.5:1.5b',     // 1.5B для простых задач
+    // ВСЕ real-time задачи на FAST сервере
+    tasks: ['classify', 'sentiment', 'language', 'tagging', 'simple', 'analyze', 'chat', 'rag', 'complex', 'creative', 'generate'],
+    maxTokens: 1024,
+    timeout: 15000,  // 15 сек максимум
   },
   quality: {
     name: 'QUALITY',
     url: process.env.OLLAMA_QUALITY_URL || 'http://31.76.93.2:11434',
-    models: ['qwen2.5:32b-instruct-q4_K_M', 'qwen2.5:14b', 'qwen2.5:7b'],
-    defaultModel: 'qwen2.5:32b-instruct-q4_K_M',  // 32B - максимальное качество
-    complexModel: 'qwen2.5:32b-instruct-q4_K_M',
-    fallbackModel: 'qwen2.5:14b',  // Fallback если 32b не справляется
-    tasks: ['chat', 'rag', 'complex', 'creative', 'generate'],
-    maxTokens: 4096,  // 32b поддерживает больше токенов
-    timeout: 180000,  // 3 минуты для больших ответов
+    models: ['qwen2.5:7b'],
+    defaultModel: 'qwen2.5:7b',      // 7B - максимум что работает на CPU
+    complexModel: 'qwen2.5:7b',
+    // Только фоновые задачи (не real-time)
+    tasks: ['background', 'batch', 'training'],
+    maxTokens: 2048,
+    timeout: 60000,  // 1 минута для фоновых
   },
 } as const
 
