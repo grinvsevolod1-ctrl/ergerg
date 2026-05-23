@@ -9,7 +9,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Yandex OAuth not configured' }, { status: 500 })
   }
   
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://nexik.org'}/api/nexik/auth/callback/yandex`
+  // Dynamic redirect URI based on current domain
+  const host = request.headers.get('host') || 'nexik.org'
+  const protocol = host.includes('localhost') ? 'http' : 'https'
+  const baseUrl = `${protocol}://${host}`
+  const redirectUri = `${baseUrl}/api/nexik/auth/callback/yandex`
   
   const params = new URLSearchParams({
     client_id: clientId,

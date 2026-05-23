@@ -20,6 +20,11 @@ interface YandexUserInfo {
 }
 
 export async function GET(request: NextRequest) {
+  // Dynamic base URL from request
+  const host = request.headers.get('host') || 'nexik.org'
+  const protocol = host.includes('localhost') ? 'http' : 'https'
+  const baseUrl = `${protocol}://${host}`
+  
   try {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
@@ -27,21 +32,21 @@ export async function GET(request: NextRequest) {
     const error = searchParams.get('error')
     
     if (error) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/nexik/register?error=oauth_denied`)
+      return NextResponse.redirect(`${baseUrl}/nexik/register?error=oauth_denied`)
     }
     
     if (!code) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/nexik/register?error=no_code`)
+      return NextResponse.redirect(`${baseUrl}/nexik/register?error=no_code`)
     }
     
     const clientId = process.env.YANDEX_CLIENT_ID
     const clientSecret = process.env.YANDEX_CLIENT_SECRET
     
     if (!clientId || !clientSecret) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/nexik/register?error=not_configured`)
+      return NextResponse.redirect(`${baseUrl}/nexik/register?error=not_configured`)
     }
     
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://nexik.org'}/api/nexik/auth/callback/yandex`
+    const redirectUri = `${baseUrl}/api/nexik/auth/callback/yandex`
     
     // Exchange code for tokens
     const tokenRes = await fetch('https://oauth.yandex.ru/token', {
@@ -58,7 +63,7 @@ export async function GET(request: NextRequest) {
     
     if (!tokenRes.ok) {
       console.error('[Yandex OAuth] Token exchange failed:', await tokenRes.text())
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/nexik/register?error=token_failed`)
+      return NextResponse.redirect(`${baseUrl}/nexik/register?error=token_failed`)
     }
     
     const tokens: YandexTokenResponse = await tokenRes.json()
@@ -69,7 +74,7 @@ export async function GET(request: NextRequest) {
     })
     
     if (!userRes.ok) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/nexik/register?error=userinfo_failed`)
+      return NextResponse.redirect(`${baseUrl}/nexik/register?error=userinfo_failed`)
     }
     
     const yandexUser: YandexUserInfo = await userRes.json()
@@ -176,10 +181,12 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}${redirectUrl}`)
+    return NextResponse.redirect(`${baseUrl}${redirectUrl}`)
     
   } catch (error) {
     console.error('[Yandex OAuth] Error:', error)
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/nexik/register?error=server_error`)
+    const host = request.headers.get('host') || 'nexik.org'
+    const protocol = host.includes('localhost') ? 'http' : 'https'
+    return NextResponse.redirect(`${protocol}://${host}/nexik/register?error=server_error`)
   }
 }
