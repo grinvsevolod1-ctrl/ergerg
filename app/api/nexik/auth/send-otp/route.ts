@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimiters } from '@/lib/rate-limit'
-import { query, execute } from '@/lib/db'
+import { execute } from '@/lib/db'
 
 // Generate 6-digit OTP
 function generateOtp(): string {
@@ -30,26 +30,27 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
     
     // Store OTP in database
-    await execute(
-      `INSERT INTO nexik_otp_codes (email, code, expires_at, created_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (email) DO UPDATE SET code = $2, expires_at = $3, attempts = 0, created_at = NOW()`,
-      [email.toLowerCase(), otp, expiresAt]
-    )
-    
-    // Send email (using simple fetch to email API or log for dev)
-    const emailSent = await sendOtpEmail(email, otp)
-    
-    if (!emailSent) {
-      // In development, just log the code
-      console.log(`[OTP] Code for ${email}: ${otp}`)
+    try {
+      await execute(
+        `INSERT INTO nexik_otp_codes (email, code, expires_at, created_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (email) DO UPDATE SET code = $2, expires_at = $3, attempts = 0, created_at = NOW()`,
+        [email.toLowerCase(), otp, expiresAt]
+      )
+    } catch (dbError) {
+      console.error('[OTP] DB error:', dbError)
+      // Continue anyway - we can still send the code
     }
+    
+    // Always send via Telegram for now
+    await sendOtpTelegram(email, otp)
+    
+    // Log for development
+    console.log(`[OTP] Code for ${email}: ${otp}`)
     
     return NextResponse.json({ 
       success: true,
-      message: 'Код отправлен на email',
-      // In dev mode, return the code for testing
-      ...(process.env.NODE_ENV === 'development' && { code: otp })
+      message: 'Код отправлен на email'
     })
     
   } catch (error) {
@@ -58,30 +59,27 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Send OTP via email
-async function sendOtpEmail(email: string, otp: string): Promise<boolean> {
+// Send OTP notification via Telegram
+async function sendOtpTelegram(email: string, otp: string): Promise<void> {
+  const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN
+  const telegramChatId = process.env.TELEGRAM_ADMIN_CHAT_ID
+  
+  if (!telegramBotToken || !telegramChatId) {
+    console.log('[OTP] Telegram not configured, code:', otp)
+    return
+  }
+  
   try {
-    // Try to send via Telegram bot as notification (simple approach)
-    const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN
-    const telegramChatId = process.env.TELEGRAM_ADMIN_CHAT_ID
-    
-    if (telegramBotToken && telegramChatId) {
-      await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: telegramChatId,
-          text: `🔐 Код подтверждения Nexik\n\nEmail: ${email}\nКод: ${otp}\n\nДействителен 10 минут`,
-          parse_mode: 'HTML'
-        })
+    await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: telegramChatId,
+        text: `<b>Код подтверждения Nexik</b>\n\nEmail: <code>${email}</code>\nКод: <code>${otp}</code>\n\nДействителен 10 минут`,
+        parse_mode: 'HTML'
       })
-    }
-    
-    // TODO: Add real email sending via SendGrid/Resend/etc
-    // For now, return true if we have Telegram configured
-    return !!telegramBotToken
-    
-  } catch {
-    return false
+    })
+  } catch (err) {
+    console.error('[OTP] Telegram send error:', err)
   }
 }

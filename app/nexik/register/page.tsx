@@ -1,16 +1,13 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowRight, Loader2, Mail, ArrowLeft, Check } from "lucide-react"
-import { SiriOrb } from "@/components/nexik/siri-orb"
+import { ArrowRight, Loader2, ArrowLeft, Check } from "lucide-react"
 import { getBusinessContext } from "@/lib/nexik/services/unified-memory"
 
-type AuthStep = "method" | "email" | "otp" | "password" | "success"
-
-// Google icon component
+// Google icon
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none">
@@ -22,7 +19,7 @@ function GoogleIcon({ className }: { className?: string }) {
   )
 }
 
-// Yandex icon component
+// Yandex icon
 function YandexIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none">
@@ -41,19 +38,20 @@ function RegisterLoading() {
   )
 }
 
-// Main content component that uses useSearchParams
+type Step = "email" | "otp" | "success"
+
 function RegisterContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [step, setStep] = useState<AuthStep>("method")
+  const [step, setStep] = useState<Step>("email")
   const [email, setEmail] = useState("")
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
-  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [focused, setFocused] = useState<string | null>(null)
   const [platform, setPlatform] = useState<string | null>(null)
   const [resendTimer, setResendTimer] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Get platform from URL or business context
   useEffect(() => {
@@ -66,7 +64,20 @@ function RegisterContent() {
         setPlatform(ctx.platforms[0])
       }
     }
+    
+    // Check for OAuth errors
+    const urlError = searchParams.get("error")
+    if (urlError) {
+      setError(urlError === "oauth_denied" ? "Авторизация отменена" : "Ошибка авторизации")
+    }
   }, [searchParams])
+
+  // Focus email input on mount
+  useEffect(() => {
+    if (step === "email") {
+      inputRef.current?.focus()
+    }
+  }, [step])
 
   // Resend timer
   useEffect(() => {
@@ -78,7 +89,7 @@ function RegisterContent() {
 
   // Handle OTP input
   const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) value = value[0]
+    if (value.length > 1) value = value[value.length - 1]
     if (!/^\d*$/.test(value)) return
 
     const newOtp = [...otp]
@@ -87,8 +98,12 @@ function RegisterContent() {
 
     // Auto-focus next input
     if (value && index < 5) {
-      const next = document.getElementById(`otp-${index + 1}`)
-      next?.focus()
+      otpRefs.current[index + 1]?.focus()
+    }
+
+    // Auto-submit when complete
+    if (value && index === 5 && newOtp.every(d => d)) {
+      verifyOtp(newOtp.join(""))
     }
   }
 
@@ -98,35 +113,44 @@ function RegisterContent() {
     const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)
     if (paste.length === 6) {
       setOtp(paste.split(""))
+      verifyOtp(paste)
     }
   }
 
   // Handle OTP backspace
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
-      const prev = document.getElementById(`otp-${index - 1}`)
-      prev?.focus()
+      otpRefs.current[index - 1]?.focus()
     }
   }
 
   // Google OAuth
   const handleGoogleAuth = () => {
     setLoading(true)
-    const state = encodeURIComponent(JSON.stringify({ platform, returnUrl: "/nexik/dashboard" }))
+    const state = encodeURIComponent(JSON.stringify({ platform, returnUrl: "/nexik/connect/instagram" }))
     window.location.href = `/api/nexik/auth/oauth/google?state=${state}`
   }
 
   // Yandex OAuth
   const handleYandexAuth = () => {
     setLoading(true)
-    const state = encodeURIComponent(JSON.stringify({ platform, returnUrl: "/nexik/dashboard" }))
+    const state = encodeURIComponent(JSON.stringify({ platform, returnUrl: "/nexik/connect/instagram" }))
     window.location.href = `/api/nexik/auth/oauth/yandex?state=${state}`
   }
 
   // Send OTP to email
-  const sendOtp = async () => {
+  const sendOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    
     if (!email) {
       setError("Введите email")
+      return
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError("Введите корректный email")
       return
     }
 
@@ -150,20 +174,18 @@ function RegisterContent() {
 
       setStep("otp")
       setResendTimer(60)
+      setOtp(["", "", "", "", "", ""])
     } catch {
-      setError("Ошибка соединения")
+      setError("Ошибка сети")
     } finally {
       setLoading(false)
     }
   }
 
   // Verify OTP
-  const verifyOtp = async () => {
-    const code = otp.join("")
-    if (code.length !== 6) {
-      setError("Введите 6-значный код")
-      return
-    }
+  const verifyOtp = async (code?: string) => {
+    const otpCode = code || otp.join("")
+    if (otpCode.length !== 6) return
 
     setLoading(true)
     setError("")
@@ -172,505 +194,269 @@ function RegisterContent() {
       const res = await fetch("/api/nexik/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ email, code: otpCode, platform }),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
         setError(data.error || "Неверный код")
-        setLoading(false)
-        return
-      }
-
-      if (data.isNewUser) {
-        // New user - set password
-        setStep("password")
-      } else {
-        // Existing user - logged in
-        setStep("success")
-        setTimeout(() => {
-          if (platform) {
-            router.push(`/nexik/connect/${platform}`)
-          } else {
-            router.push("/nexik/dashboard")
-          }
-        }, 1500)
-      }
-    } catch {
-      setError("Ошибка соединения")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Create account with password
-  const createAccount = async () => {
-    if (password.length < 6) {
-      setError("Минимум 6 символов")
-      return
-    }
-
-    setLoading(true)
-    setError("")
-
-    try {
-      const res = await fetch("/api/nexik/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.error || "Ошибка регистрации")
+        setOtp(["", "", "", "", "", ""])
+        otpRefs.current[0]?.focus()
         setLoading(false)
         return
       }
 
       setStep("success")
+      
+      // Redirect after success
       setTimeout(() => {
-        if (platform) {
-          router.push(`/nexik/connect/${platform}`)
+        if (platform === "instagram") {
+          router.push("/nexik/connect/instagram")
         } else {
           router.push("/nexik/dashboard")
         }
       }, 1500)
     } catch {
-      setError("Ошибка соединения")
+      setError("Ошибка сети")
     } finally {
       setLoading(false)
     }
   }
 
-  // Platform label
-  const platformLabels: Record<string, string> = {
-    instagram: "Instagram",
-    telegram: "Telegram",
-    whatsapp: "WhatsApp",
-    vk: "ВКонтакте",
-    facebook: "Facebook",
+  // Resend OTP
+  const resendOtp = async () => {
+    if (resendTimer > 0) return
+    await sendOtp()
   }
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-black flex items-center justify-center p-4 overflow-hidden">
-      {/* Animated background */}
-      <div className="fixed inset-0 pointer-events-none">
-        <motion.div 
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] md:w-[800px] md:h-[800px]"
-          animate={{ scale: [1, 1.1, 1], rotate: [0, 180, 360] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-        >
-          <div className="absolute inset-0 bg-gradient-radial from-cyan-500/10 via-transparent to-transparent blur-3xl" />
-        </motion.div>
-      </div>
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+      {/* Back button */}
+      <motion.button
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        onClick={() => step === "otp" ? setStep("email") : router.back()}
+        className="absolute top-4 left-4 sm:top-8 sm:left-8 flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span className="text-sm">Назад</span>
+      </motion.button>
 
-      {/* Grid pattern */}
-      <div 
-        className="fixed inset-0 pointer-events-none opacity-[0.02]"
-        style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                           linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-          backgroundSize: '60px 60px'
-        }}
-      />
-
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="w-full max-w-sm relative z-10"
+        className="w-full max-w-sm"
       >
-        {/* Back button (on non-method steps) */}
-        {step !== "method" && step !== "success" && (
-          <motion.button
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            onClick={() => {
-              if (step === "otp") setStep("email")
-              else if (step === "password") setStep("otp")
-              else if (step === "email") setStep("method")
-            }}
-            className="absolute -top-12 left-0 flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-sm"
-          >
-            <ArrowLeft size={16} />
-            Назад
-          </motion.button>
-        )}
-
         {/* Logo */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="flex justify-center mb-8"
-        >
-          <Link href="/nexik" className="group">
-            <SiriOrb size={56} color="#00ffff" state={loading ? "thinking" : "idle"} />
-          </Link>
-        </motion.div>
+        <div className="text-center mb-8">
+          <motion.h1 
+            className="text-2xl font-semibold text-white mb-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            {step === "success" ? "Готово!" : step === "otp" ? "Введите код" : "Создать аккаунт"}
+          </motion.h1>
+          <motion.p 
+            className="text-white/50 text-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { delay: 0.1 } }}
+          >
+            {step === "success" 
+              ? "Аккаунт создан" 
+              : step === "otp" 
+                ? `Код отправлен на ${email}`
+                : "Войдите чтобы начать использовать Nexik"
+            }
+          </motion.p>
+        </div>
 
         <AnimatePresence mode="wait">
-          {/* Step: Choose method */}
-          {step === "method" && (
-            <motion.div
-              key="method"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-6"
-            >
-              {/* Title */}
-              <div className="text-center">
-                <h1 className="text-xl font-medium text-white mb-2">
-                  Создать аккаунт
-                </h1>
-                {platform && (
-                  <p className="text-zinc-500 text-sm">
-                    Для подключения {platformLabels[platform] || platform}
-                  </p>
-                )}
-              </div>
-
-              {/* OAuth buttons */}
-              <div className="space-y-3">
-                <motion.button
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={handleGoogleAuth}
-                  disabled={loading}
-                  className="w-full py-3.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-100 transition-colors flex items-center justify-center gap-3 text-sm disabled:opacity-50"
-                >
-                  <GoogleIcon className="w-5 h-5" />
-                  Продолжить с Google
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={handleYandexAuth}
-                  disabled={loading}
-                  className="w-full py-3.5 bg-[#FC3F1D] text-white font-medium rounded-xl hover:bg-[#e53815] transition-colors flex items-center justify-center gap-3 text-sm disabled:opacity-50"
-                >
-                  <YandexIcon className="w-5 h-5" />
-                  Продолжить с Яндекс
-                </motion.button>
-              </div>
-
-              {/* Divider */}
-              <div className="flex items-center gap-4">
-                <div className="flex-1 h-px bg-white/10" />
-                <span className="text-xs text-zinc-600">или</span>
-                <div className="flex-1 h-px bg-white/10" />
-              </div>
-
-              {/* Email button */}
-              <motion.button
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                onClick={() => setStep("email")}
-                className="w-full py-3.5 border border-white/10 rounded-xl text-zinc-400 hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-3 text-sm"
-              >
-                <Mail size={18} />
-                Продолжить с Email
-              </motion.button>
-
-              {/* Login link */}
-              <div className="text-center text-sm text-zinc-600 pt-2">
-                Уже есть аккаунт?{" "}
-                <Link href="/nexik/login" className="text-white hover:text-cyan-400 transition-colors">
-                  Войти
-                </Link>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step: Enter email */}
           {step === "email" && (
             <motion.div
               key="email"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-6"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
             >
-              <div className="text-center">
-                <h1 className="text-xl font-medium text-white mb-2">
-                  Введите email
-                </h1>
-                <p className="text-zinc-500 text-sm">
-                  Отправим код подтверждения
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="relative">
+              {/* Email form */}
+              <form onSubmit={sendOtp} className="space-y-4">
+                <div>
                   <input
+                    ref={inputRef}
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onFocus={() => setFocused("email")}
-                    onBlur={() => setFocused(null)}
-                    onKeyDown={(e) => e.key === "Enter" && sendOtp()}
-                    className="w-full px-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:bg-white/[0.05] transition-all text-sm text-center"
+                    onChange={(e) => {
+                      setEmail(e.target.value)
+                      setError("")
+                    }}
                     placeholder="email@example.com"
-                    autoFocus
+                    className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all"
+                    autoComplete="email"
                   />
-                  {focused === "email" && (
-                    <motion.div 
-                      layoutId="focus-ring"
-                      className="absolute inset-0 rounded-xl border border-cyan-500/50 pointer-events-none"
-                    />
-                  )}
                 </div>
 
                 {error && (
-                  <motion.div 
+                  <motion.p
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center"
+                    className="text-red-400 text-sm text-center"
                   >
                     {error}
-                  </motion.div>
+                  </motion.p>
                 )}
 
-                <motion.button
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={sendOtp}
+                <button
+                  type="submit"
                   disabled={loading || !email}
-                  className="w-full py-3.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                  className="w-full h-12 bg-white text-black font-medium rounded-lg hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                 >
                   {loading ? (
-                    <>
-                      <Loader2 className="animate-spin" size={18} />
-                      Отправка...
-                    </>
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     <>
-                      Получить код
-                      <ArrowRight size={18} />
+                      Продолжить
+                      <ArrowRight className="w-4 h-4" />
                     </>
                   )}
-                </motion.button>
+                </button>
+              </form>
+
+              {/* Divider */}
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/10"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="px-2 bg-black text-white/40">или</span>
+                </div>
               </div>
+
+              {/* Social login buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleGoogleAuth}
+                  disabled={loading}
+                  className="flex-1 h-11 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                >
+                  <GoogleIcon className="w-5 h-5" />
+                  <span className="text-white/80 text-sm">Google</span>
+                </button>
+
+                <button
+                  onClick={handleYandexAuth}
+                  disabled={loading}
+                  className="flex-1 h-11 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                >
+                  <YandexIcon className="w-5 h-5" />
+                  <span className="text-white/80 text-sm">Яндекс</span>
+                </button>
+              </div>
+
+              {/* Terms */}
+              <p className="text-white/30 text-xs text-center mt-6">
+                Продолжая, вы соглашаетесь с{" "}
+                <Link href="/terms" className="text-white/50 hover:text-white/70 underline">
+                  условиями использования
+                </Link>
+              </p>
+
+              {/* Login link */}
+              <p className="text-white/50 text-sm text-center mt-4">
+                Уже есть аккаунт?{" "}
+                <Link href="/nexik/login" className="text-white hover:underline">
+                  Войти
+                </Link>
+              </p>
             </motion.div>
           )}
 
-          {/* Step: Enter OTP */}
           {step === "otp" && (
             <motion.div
               key="otp"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              <div className="text-center">
-                <h1 className="text-xl font-medium text-white mb-2">
-                  Введите код
-                </h1>
-                <p className="text-zinc-500 text-sm">
-                  Отправили на {email}
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                {/* OTP inputs */}
-                <div className="flex justify-center gap-2">
-                  {otp.map((digit, index) => (
-                    <input
-                      key={index}
-                      id={`otp-${index}`}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(index, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                      onPaste={handleOtpPaste}
-                      className="w-11 h-13 bg-white/[0.03] border border-white/10 rounded-xl text-white text-center text-lg font-medium focus:outline-none focus:border-cyan-500/50 focus:bg-white/[0.05] transition-all"
-                      autoFocus={index === 0}
-                    />
-                  ))}
-                </div>
-
-                {error && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center"
-                  >
-                    {error}
-                  </motion.div>
-                )}
-
-                <motion.button
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={verifyOtp}
-                  disabled={loading || otp.join("").length !== 6}
-                  className="w-full py-3.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="animate-spin" size={18} />
-                      Проверка...
-                    </>
-                  ) : (
-                    <>
-                      Подтвердить
-                      <ArrowRight size={18} />
-                    </>
-                  )}
-                </motion.button>
-
-                {/* Resend */}
-                <div className="text-center">
-                  {resendTimer > 0 ? (
-                    <span className="text-sm text-zinc-600">
-                      Отправить снова через {resendTimer}с
-                    </span>
-                  ) : (
-                    <button
-                      onClick={sendOtp}
-                      className="text-sm text-zinc-500 hover:text-white transition-colors"
-                    >
-                      Отправить код снова
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Step: Create password */}
-          {step === "password" && (
-            <motion.div
-              key="password"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-6"
-            >
-              <div className="text-center">
-                <h1 className="text-xl font-medium text-white mb-2">
-                  Создайте пароль
-                </h1>
-                <p className="text-zinc-500 text-sm">
-                  Минимум 6 символов
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="relative">
+              {/* OTP inputs */}
+              <div className="flex justify-center gap-2 sm:gap-3">
+                {otp.map((digit, index) => (
                   <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onFocus={() => setFocused("password")}
-                    onBlur={() => setFocused(null)}
-                    onKeyDown={(e) => e.key === "Enter" && createAccount()}
-                    className="w-full px-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:bg-white/[0.05] transition-all text-sm"
-                    placeholder="Пароль"
-                    autoFocus
+                    key={index}
+                    ref={(el) => { otpRefs.current[index] = el }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(index, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                    onPaste={index === 0 ? handleOtpPaste : undefined}
+                    className="w-11 h-14 sm:w-12 sm:h-14 text-center text-xl font-medium bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all"
+                    autoFocus={index === 0}
                   />
-                  {focused === "password" && (
-                    <motion.div 
-                      layoutId="focus-ring"
-                      className="absolute inset-0 rounded-xl border border-cyan-500/50 pointer-events-none"
-                    />
-                  )}
-                </div>
+                ))}
+              </div>
 
-                {error && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center"
-                  >
-                    {error}
-                  </motion.div>
-                )}
-
-                <motion.button
-                  whileHover={{ scale: 1.01 }}
-                  whileTap={{ scale: 0.99 }}
-                  onClick={createAccount}
-                  disabled={loading || password.length < 6}
-                  className="w-full py-3.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-red-400 text-sm text-center"
                 >
-                  {loading ? (
-                    <>
-                      <Loader2 className="animate-spin" size={18} />
-                      Создание...
-                    </>
-                  ) : (
-                    <>
-                      Создать аккаунт
-                      <ArrowRight size={18} />
-                    </>
-                  )}
-                </motion.button>
+                  {error}
+                </motion.p>
+              )}
+
+              {loading && (
+                <div className="flex justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+                </div>
+              )}
+
+              {/* Resend */}
+              <div className="text-center">
+                {resendTimer > 0 ? (
+                  <p className="text-white/40 text-sm">
+                    Отправить повторно через {resendTimer} сек
+                  </p>
+                ) : (
+                  <button
+                    onClick={resendOtp}
+                    disabled={loading}
+                    className="text-white/60 text-sm hover:text-white transition-colors"
+                  >
+                    Отправить код повторно
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
 
-          {/* Step: Success */}
           {step === "success" && (
             <motion.div
               key="success"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-6"
+              className="flex flex-col items-center gap-4"
             >
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", delay: 0.2 }}
-                className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto"
+                className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center"
               >
                 <Check className="w-8 h-8 text-green-500" />
               </motion.div>
-              
-              <div>
-                <h1 className="text-xl font-medium text-white mb-2">
-                  Готово!
-                </h1>
-                <p className="text-zinc-500 text-sm">
-                  {platform 
-                    ? `Переходим к подключению ${platformLabels[platform] || platform}...`
-                    : "Переходим в панель управления..."
-                  }
-                </p>
-              </div>
-
-              <Loader2 className="w-6 h-6 animate-spin text-zinc-500 mx-auto" />
+              <p className="text-white/60 text-sm">Перенаправляем...</p>
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Terms */}
-        {step !== "success" && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-8 text-center text-xs text-zinc-600"
-          >
-            Продолжая, вы соглашаетесь с{" "}
-            <Link href="/terms" className="text-zinc-500 hover:text-white transition-colors">
-              условиями использования
-            </Link>
-          </motion.p>
-        )}
       </motion.div>
     </div>
   )
 }
 
-// Main page component with Suspense boundary
 export default function NexikRegisterPage() {
   return (
     <Suspense fallback={<RegisterLoading />}>
