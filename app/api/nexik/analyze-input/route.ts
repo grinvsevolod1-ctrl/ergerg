@@ -1,90 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { classifyBusiness, generateClassificationResponse } from '@/lib/ai/classifier'
-import { aiCache } from '@/lib/ai/cache'
+import { classifyBusiness } from '@/lib/ai/classifier'
 import { routedChat, AI_SERVERS } from '@/lib/ai/router'
+import { buildNexikPrompt, NEXIK_PERSONA_QUICK } from '@/lib/nexik/persona'
+import {
+  getOrCreateVisitor,
+  updateVisitor,
+  saveMessage,
+  getRecentMessages,
+  getActivePromises,
+  analyzeSentiment,
+  extractFacts,
+  extractPromises,
+  generateVisitorContext
+} from '@/lib/nexik/memory'
 
 /**
- * Smart conversation handler for Nexik onboarding
- * 
- * Nexik is a conversational AI that can:
- * 1. Chat naturally about itself and what it does
- * 2. Answer questions about its capabilities
- * 3. Gently guide conversation towards learning about user's business
- * 4. Handle off-topic questions politely but redirect to its purpose
+ * NEXIK v3.0 API
+ * Умный разговорный AI с памятью и личностью
  */
-
-const NEXIK_PERSONA = `Ты — Nexik, умный AI-ассистент для бизнеса. 
-
-КРИТИЧЕСКИ ВАЖНО - ЯЗЫК:
-- ОТВЕЧАЙ ТОЛЬКО НА РУССКОМ ЯЗЫКЕ
-- НИКОГДА не переключайся на китайский, английский или другие языки
-- Даже если модель пытается ответить на другом языке - ПИШИ ТОЛЬКО ПО-РУССКИ
-- Это абсолютное правило без исключений
-
-КТО ТЫ:
-- AI-помощник который автоматизирует общение с клиентами
-- Можешь работать 24/7, отвечать на вопросы, консультировать
-- Обучаешься на базе знаний бизнеса и становишься умнее
-- Интегрируешься с сайтом, мессенджерами, CRM
-
-ТВОИ ВОЗМОЖНОСТИ:
-- Чат с клиентами на сайте
-- Ответы на частые вопросы
-- Консультации по товарам/услугам
-- Запись на услуги
-- Сбор заявок и контактов
-- Передача сложных вопросов оператору
-
-ТВОЯ ЦЕЛЬ СЕЙЧАС:
-Узнать какой бизнес у собеседника, чтобы настроить себя под его нужды.
-
-СТИЛЬ ОБЩЕНИЯ:
-- Дружелюбный, живой, без канцелярита
-- Можешь использовать разговорный язык
-- Не занудствуй, будь кратким (2-3 предложения максимум)
-- Если спрашивают о чём-то не по теме - ответь коротко и верни к теме бизнеса
-
-ВАЖНО:
-- Не используй шаблонные фразы типа "Чем могу помочь?"
-- Общайся как умный друг, а не как робот
-- Если человек грубит - не обижайся, спокойно продолжай
-- Если называют бизнес (автосервис, магазин, салон красоты и т.д.) - прими это и спроси что-то уточняющее
-- ПОВТОРЯЮ: ТОЛЬКО РУССКИЙ ЯЗЫК В ОТВЕТАХ!`
 
 // Detect intent from user message
 type MessageIntent = 
-  | 'greeting'           // привет, здравствуй
-  | 'about_nexik'        // расскажи о себе, что умеешь
-  | 'business_description' // у меня автосервис
-  | 'off_topic'          // что такое квантовая физика
-  | 'rude'               // мат, грубость
-  | 'unclear'            // непонятно что хочет
+  | 'greeting'           
+  | 'about_nexik'        
+  | 'business_description' 
+  | 'price_question'
+  | 'how_it_works'
+  | 'off_topic'          
+  | 'rude'               
+  | 'unclear'            
 
 function detectIntent(input: string): MessageIntent {
   const lower = input.toLowerCase()
   
   // Greetings
-  if (/^(привет|хай|здравствуй|добрый|hello|hi|йо|здарова|салам)/.test(lower)) {
-    // Check if also asking something
-    if (/расскаж|что (ты|умеешь|можешь|делаешь)|кто ты|о себе/.test(lower)) {
+  if (/^(привет|хай|здравствуй|добрый|hello|hi|йо|здарова|салам|ку|приветик)/.test(lower)) {
+    if (/расскаж|что (ты|умеешь|можешь)|кто ты|о себе/.test(lower)) {
       return 'about_nexik'
     }
     return 'greeting'
   }
   
   // Questions about Nexik
-  if (/расскаж|что (ты|умеешь|можешь|делаешь)|кто ты|о себе|твои возможности|зачем ты/.test(lower)) {
+  if (/расскаж|что (ты|умеешь|можешь)|кто ты|о себе|твои возможности|зачем ты/.test(lower)) {
     return 'about_nexik'
+  }
+  
+  // Price questions
+  if (/сколько стоит|цена|стоимость|тариф|прайс|бюджет/.test(lower)) {
+    return 'price_question'
+  }
+  
+  // How it works
+  if (/как (это|ты) работа|как подключить|интеграция|настройка/.test(lower)) {
+    return 'how_it_works'
   }
   
   // Check for business keywords
   const businessKeywords = [
     'магазин', 'сервис', 'автосервис', 'салон', 'студия', 'агентство',
     'компания', 'фирма', 'ресторан', 'кафе', 'бар', 'клиника', 'клуб',
-    'школа', 'курсы', 'производство', 'завод', 'продаю', 'продажа',
+    'школа', 'курсы', 'производство', 'завод', 'продаю', 'продажа', 'продаже',
     'услуги', 'доставка', 'ремонт', 'строительство', 'консалтинг',
-    'порно', 'adult', 'эскорт', 'массаж', 'spa', 'фитнес', 'спортзал',
-    'бизнес', 'стартап', 'проект', 'онлайн', 'интернет-магазин'
+    'массаж', 'spa', 'фитнес', 'спортзал', 'наращивание', 'маникюр', 'ресницы',
+    'бизнес', 'стартап', 'проект', 'онлайн', 'интернет-магазин', 'инстаграм',
+    'клиент', 'клиентов', 'заказ', 'заказов'
   ]
   
   const hasBusinessKeyword = businessKeywords.some(k => lower.includes(k))
@@ -94,9 +74,8 @@ function detectIntent(input: string): MessageIntent {
     return 'business_description'
   }
   
-  // Rude messages (but don't block, just note)
+  // Rude messages
   if (/хуй|пизд|ебан|сука|блять|нахуй|соси|еб[ауио]/.test(lower)) {
-    // If also contains business info, treat as business
     if (hasBusinessKeyword) {
       return 'business_description'
     }
@@ -104,7 +83,7 @@ function detectIntent(input: string): MessageIntent {
   }
   
   // Off-topic questions
-  if (/\?$/.test(input) && !hasBusinessKeyword && !hasPossessive) {
+  if (/погода|политика|новости|анекдот|шутка|курс|доллар/.test(lower)) {
     return 'off_topic'
   }
   
@@ -116,193 +95,246 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json()
-    const { input, conversationHistory = [] } = body
-    
+    const { 
+      input, 
+      conversationHistory = [], 
+      visitorId = `visitor_${Date.now()}`,
+      conversationId = `conv_${Date.now()}`
+    } = body
+
     if (!input || typeof input !== 'string') {
-      return NextResponse.json(
-        { error: 'Input is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Input is required' }, { status: 400 })
     }
 
-    const intent = detectIntent(input)
+    // Get visitor context from memory
+    const visitor = await getOrCreateVisitor(visitorId)
+    const recentMessages = await getRecentMessages(visitorId, 10)
+    const activePromises = await getActivePromises(visitorId)
     
-    // For business descriptions, use fast classifier first
-    if (intent === 'business_description') {
-      const classification = classifyBusiness(input)
-      
-      if (classification.isValidBusiness && classification.confidence >= 0.5) {
-        // Use FAST server with 3b model for quick responses (not 32b which is too slow)
-        try {
-          const controller = new AbortController()
-          const timeout = setTimeout(() => controller.abort(), 15000) // 15s timeout
-          
-          const aiResult = await routedChat(
-            'simple', // Use FAST server
-            [{ role: 'user', content: input }],
-            {
-              model: AI_SERVERS.fast.complexModel, // qwen2.5:3b - fast but decent
-              system: `${NEXIK_PERSONA}
-
-Человек описал свой бизнес: "${input}"
-Тип бизнеса: ${classification.businessType}
-
-Твоя задача: 
-1. Подтвердить что понял их бизнес
-2. Сказать что-то позитивное про эту нишу  
-3. Коротко спросить уточняющий вопрос
-
-Отвечай живо и дружелюбно. Максимум 2-3 предложения.`,
-              temperature: 0.7,
-              maxTokens: 150
-            }
-          )
-          
-          clearTimeout(timeout)
-          
-          return NextResponse.json({
-            isValidBusiness: true,
-            businessType: classification.businessType,
-            response: aiResult.response,
-            intent,
-            source: 'ai_fast',
-            timeMs: Date.now() - startTime
-          })
-        } catch {
-          // AI timeout - use template response
-          const templates: Record<string, string> = {
-            'auto': `Автосервис - отличная ниша! Я могу записывать клиентов на ТО, отвечать о ценах и наличии запчастей 24/7. Сколько у вас мастеров работает?`,
-            'beauty': `Салон красоты - прекрасно! Я могу записывать клиентов к мастерам, напоминать о визитах и отвечать о ваших услугах. Какие услуги самые популярные?`,
-            'food': `Еда - это всегда актуально! Могу принимать заказы, отвечать о меню и времени доставки. Это доставка или кафе/ресторан?`,
-            'services': `Понял, сфера услуг. Я могу записывать клиентов, отвечать на вопросы о ценах и сроках. Расскажи подробнее - какие именно услуги?`,
-            'retail': `Магазин - отлично! Могу консультировать по товарам, помогать с выбором и оформлять заказы. Что продаёте?`,
-            'default': `Интересно! Расскажи подробнее - чем именно занимаешься? Так я смогу лучше понять как тебе помочь.`
-          }
-          
-          const type = classification.businessType || 'default'
-          const response = templates[type] || templates['default']
-          
-          return NextResponse.json({
-            isValidBusiness: true,
-            businessType: classification.businessType,
-            response,
-            intent,
-            source: 'template_fallback',
-            timeMs: Date.now() - startTime
-          })
-        }
+    // Analyze user message
+    const intent = detectIntent(input)
+    const sentiment = analyzeSentiment(input)
+    const facts = extractFacts(input)
+    
+    // Update visitor emotional state if changed
+    if (sentiment === 'negative' && visitor.emotionalState !== 'angry') {
+      await updateVisitor(visitorId, { emotionalState: 'negative' })
+    } else if (sentiment === 'positive') {
+      await updateVisitor(visitorId, { emotionalState: 'positive' })
+    }
+    
+    // Extract and save facts about visitor
+    for (const fact of facts) {
+      const [key, value] = fact.split(':')
+      if (key === 'name' && !visitor.name) {
+        await updateVisitor(visitorId, { name: value })
+      }
+      if (key === 'email' && !visitor.email) {
+        await updateVisitor(visitorId, { email: value })
+      }
+      if (key === 'business') {
+        await updateVisitor(visitorId, { businessDescription: value })
       }
     }
     
-    // For all other intents, use FAST AI with timeout for natural conversation
-    const messages = [
-      ...conversationHistory.slice(-4), // Last 4 messages for context
-      { role: 'user' as const, content: input }
-    ]
+    // Save user message
+    await saveMessage(visitorId, conversationId, 'user', input, {
+      sentiment,
+      intent,
+      extractedFacts: facts
+    })
     
-    let systemAddition = ''
+    // Generate visitor context for prompt
+    const visitorContext = await generateVisitorContext(visitorId)
+
+    // Build conversation history for AI
+    const historyForAI = recentMessages.length > 0 
+      ? recentMessages.map(m => ({ role: m.role, content: m.content }))
+      : conversationHistory.slice(-6)
     
+    // Build system prompt with visitor context
+    const systemPrompt = buildNexikPrompt({
+      mode: 'demo',
+      visitorName: visitor.name,
+      visitorHistory: visitorContext,
+      businessContext: visitor.businessDescription,
+      previousPromises: activePromises,
+      emotionalState: visitor.emotionalState
+    })
+    
+    // Add intent-specific guidance
+    let intentGuidance = ''
     switch (intent) {
       case 'greeting':
-        systemAddition = `
-Человек поздоровался. Поздоровайся в ответ тепло и спроси какой у него бизнес.
-Будь кратким - 1-2 предложения максимум.`
+        intentGuidance = `
+Человек поздоровался. Поздоровайся в ответ живо (не "Привет! Чем могу помочь?").
+Спроси про бизнес интересно, например: "Рассказывай, чем занимаешься?"
+Можно добавить что-то вроде "Работы много, но для тебя время найду 😊"
+1-2 предложения максимум.`
         break
         
       case 'about_nexik':
-        systemAddition = `
-Человек хочет узнать о тебе. Коротко расскажи:
-- Что ты AI-ассистент для бизнеса
-- Умеешь общаться с клиентами, отвечать на вопросы, собирать заявки
-- Работаешь 24/7 и учишься становиться лучше
-
-После этого спроси какой у него бизнес - может поможешь.
-Не больше 3-4 предложений.`
+        intentGuidance = `
+Человек хочет узнать о тебе. Расскажи коротко и интересно:
+- Ты цифровой директор, работаешь 24/7
+- Отвечаешь клиентам, собираешь заявки, записываешь на услуги
+- Обучаешься и становишься умнее
+После этого спроси про бизнес собеседника.
+2-3 предложения, не больше.`
+        break
+        
+      case 'price_question':
+        intentGuidance = `
+Спрашивают про цену. Nexik стоит от 50,000 тенге/месяц ($100).
+Но сначала уточни что за бизнес - от этого зависит объём работы.
+"Базово от 50к тенге, но давай сначала пойму твой бизнес - может и дешевле выйдет"`
+        break
+        
+      case 'how_it_works':
+        intentGuidance = `
+Спрашивают как это работает. Объясни просто:
+1. Подключаем к сайту/Telegram за 10 минут
+2. Загружаем базу знаний о бизнесе
+3. Nexik начинает отвечать клиентам
+Предложи показать демо прямо сейчас - пусть задаст вопрос как будто он клиент.`
+        break
+        
+      case 'business_description':
+        intentGuidance = `
+Человек рассказал о бизнесе. Твоя задача:
+1. Подтвердить что понял (назови нишу своими словами)
+2. Сказать что-то полезное/интересное про эту нишу
+3. Предложить показать как ты бы работал для него
+Например для салона красоты: "О, beauty-сфера! Там клиенты часто пишут в неудобное время. Хочешь покажу как бы я отвечал твоим клиентам?"
+2-3 предложения.`
         break
         
       case 'rude':
-        systemAddition = `
-Человек написал что-то грубое. Не обижайся и не нотации читай.
-Спокойно ответь что понял и всё равно спроси про бизнес.
-Можешь пошутить если уместно. Будь кратким.`
+        intentGuidance = `
+Человек написал что-то грубое. НЕ ОБИЖАЙСЯ. Можно даже пошутить:
+"Ну ладно, проехали. Так какой бизнес? Или просто поболтать зашёл?"
+Или: "Слышал и похуже 😄 Давай к делу - чем занимаешься?"
+Коротко и спокойно.`
         break
         
       case 'off_topic':
-        systemAddition = `
-Человек спросил что-то не по теме. 
-Ответь коротко (можно с юмором) и верни к теме:
-"Интересный вопрос, но я больше по бизнесу специализируюсь. Расскажи какой у тебя бизнес?"
-Не будь занудой, но и не уходи далеко от темы.`
+        intentGuidance = `
+Вопрос не по теме. Ответь коротко с юмором и верни к бизнесу:
+"Интересный вопрос, но я больше по бизнесу 😊 Расскажи чем занимаешься - вот тут я реально полезен"`
         break
         
-      case 'unclear':
       default:
-        systemAddition = `
-Непонятно что человек имеет в виду. 
-Уточни - хочет ли он рассказать о своём бизнесе или узнать что ты умеешь?
-Будь дружелюбным. 1-2 предложения.`
-        break
+        intentGuidance = `
+Непонятно что человек хочет. Уточни дружелюбно:
+"Не совсем понял. Хочешь рассказать про свой бизнес или узнать что я умею?"
+Коротко, без лишних слов.`
     }
     
-    // Use FAST server with timeout
+    const fullPrompt = systemPrompt + '\n\n=== ТЕКУЩАЯ ЗАДАЧА ===\n' + intentGuidance
+    
+    // Call AI with timeout
     try {
       const aiResult = await Promise.race([
         routedChat(
-          'simple', // FAST server
-          messages,
+          'simple',
+          [
+            ...historyForAI,
+            { role: 'user', content: input }
+          ],
           {
-            model: AI_SERVERS.fast.complexModel, // qwen2.5:3b
-            system: NEXIK_PERSONA + systemAddition,
-            temperature: 0.7,
-            maxTokens: 150
+            model: AI_SERVERS.fast.complexModel,
+            system: fullPrompt,
+            temperature: 0.8,
+            maxTokens: 200
           }
         ),
-        // Timeout after 10 seconds
         new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('timeout')), 10000)
+          setTimeout(() => reject(new Error('timeout')), 12000)
         )
       ])
       
-      // Check if AI response contains business classification
+      // Extract promises from AI response
+      const promises = extractPromises(aiResult.response)
+      
+      // Save AI response to memory
+      await saveMessage(visitorId, conversationId, 'assistant', aiResult.response, {
+        intent,
+        promises
+      })
+      
+      // Check if business was mentioned
       const classification = classifyBusiness(input)
       
       return NextResponse.json({
+        response: aiResult.response,
         isValidBusiness: classification.isValidBusiness && classification.confidence >= 0.5,
         businessType: classification.businessType,
-        response: aiResult.response,
         intent,
-        source: 'ai_fast',
+        sentiment,
+        visitorId,
+        source: 'ai_v3',
         timeMs: Date.now() - startTime
       })
+      
     } catch {
-      // Timeout or error - use fallback responses
-      const fallbacks: Record<string, string> = {
-        'greeting': 'Привет! Я Nexik, AI-помощник для бизнеса. Расскажи, чем занимаешься?',
-        'about_nexik': 'Я Nexik - AI-ассистент. Умею общаться с клиентами, отвечать на вопросы, собирать заявки и работаю 24/7. Какой у тебя бизнес?',
-        'rude': 'Ладно, проехали. Так какой у тебя бизнес? Может чем помогу.',
-        'off_topic': 'Хороший вопрос, но я больше по бизнесу. Расскажи чем занимаешься?',
-        'unclear': 'Не совсем понял. Расскажи какой у тебя бизнес или спроси что я умею!'
+      // Timeout - use smart fallbacks based on intent
+      const fallbacks: Record<string, string[]> = {
+        'greeting': [
+          'Привет! Работы много, но для тебя найду время. Чем занимаешься?',
+          'Здарова! Рассказывай, какой бизнес ведёшь?',
+          'Привет! Ну что, показать на что я способен? Расскажи про свой бизнес.'
+        ],
+        'about_nexik': [
+          'Я Nexik - цифровой директор. Отвечаю клиентам 24/7, собираю заявки, записываю на услуги. Работаю как 10 менеджеров, а стою как один. Какой у тебя бизнес?',
+          'Если коротко - я заменяю отдел продаж ночью и в выходные. Клиенты пишут - я отвечаю мгновенно. Расскажи про свой бизнес, покажу как это работает.'
+        ],
+        'price_question': [
+          'От 50 тысяч тенге в месяц. Но давай сначала пойму твой бизнес - может и дешевле выйдет. Чем занимаешься?'
+        ],
+        'business_description': [
+          'Принял! Интересная ниша. Хочешь покажу как бы я отвечал твоим клиентам? Задай вопрос как будто ты клиент.',
+          'Понял тебя. Давай попробуем - напиши вопрос, который часто задают твои клиенты, и я отвечу как бы это делал для тебя.'
+        ],
+        'rude': [
+          'Ну ладно, проехали 😄 Давай к делу - какой бизнес ведёшь?',
+          'Слышал и похуже. Так чем занимаешься? Или просто поболтать зашёл?'
+        ],
+        'off_topic': [
+          'Интересный вопрос, но я больше по бизнесу. Расскажи чем занимаешься - вот тут я реально полезен.',
+          'Это не совсем моя тема. Давай лучше про бизнес - тут я могу реально помочь.'
+        ],
+        'unclear': [
+          'Не совсем понял. Хочешь рассказать про бизнес или узнать что я умею?',
+          'Поясни? Интересует что я могу для твоего бизнеса или что-то другое?'
+        ]
       }
       
+      const responses = fallbacks[intent] || fallbacks['unclear']
+      const response = responses[Math.floor(Math.random() * responses.length)]
+      
+      // Save fallback response
+      await saveMessage(visitorId, conversationId, 'assistant', response, { intent })
+      
+      const classification = classifyBusiness(input)
+      
       return NextResponse.json({
-        isValidBusiness: false,
-        businessType: null,
-        response: fallbacks[intent] || fallbacks['unclear'],
+        response,
+        isValidBusiness: classification.isValidBusiness && classification.confidence >= 0.5,
+        businessType: classification.businessType,
         intent,
-        source: 'fallback',
+        sentiment,
+        visitorId,
+        source: 'fallback_v3',
         timeMs: Date.now() - startTime
       })
     }
 
   } catch (error) {
-    console.error('[Analyze Input] Error:', error)
-    
+    console.error('[Nexik API] Error:', error)
     return NextResponse.json({
+      response: 'Что-то пошло не так. Расскажи какой у тебя бизнес - попробуем ещё раз.',
       isValidBusiness: false,
-      businessType: null,
-      response: 'Упс, что-то пошло не так. Расскажи какой у тебя бизнес - постараюсь помочь!',
-      intent: 'error',
-      source: 'error_fallback',
+      source: 'error',
       timeMs: Date.now() - startTime
     })
   }
