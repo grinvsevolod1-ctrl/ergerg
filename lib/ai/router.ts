@@ -1,38 +1,33 @@
 /**
- * Nexik AI Router - Dual Server Architecture
+ * Nexik AI Router - Dual Server Load Balancing
  * 
- * FAST server (2.26.75.147): qwen2.5:1.5b, qwen2.5:3b - for simple tasks
- * QUALITY server (31.76.93.2): qwen2.5:32b-instruct-q4_K_M, qwen2.5:14b - for complex tasks
+ * FAST server (2.26.75.147): 6 ядер, 12GB RAM, qwen2.5:3b
+ * QUALITY server (31.76.93.2): 16 ядер, 32GB RAM, qwen2.5:3b
+ * 
+ * Round-robin load balancing с failover
  */
 
 import { getConfig } from './config'
 
-// Server configuration
-// FAST - единственный рабочий сервер для real-time (CPU 11GB RAM)
-// QUALITY - слишком медленный на CPU, используем только для фоновых задач
+// Server configuration - оба сервера теперь равнозначны
 export const AI_SERVERS = {
   fast: {
     name: 'FAST',
     url: process.env.OLLAMA_FAST_URL || 'http://2.26.75.147:11434',
-    models: ['qwen2.5:1.5b', 'qwen2.5:3b'],
-    defaultModel: 'qwen2.5:3b',      // 3B как основная - 2-4 сек
-    complexModel: 'qwen2.5:3b',
-    simpleModel: 'qwen2.5:1.5b',     // 1.5B для простых задач
-    // ВСЕ real-time задачи на FAST сервере
-    tasks: ['classify', 'sentiment', 'language', 'tagging', 'simple', 'analyze', 'chat', 'rag', 'complex', 'creative', 'generate'],
+    models: ['qwen2.5:3b'],
+    defaultModel: 'qwen2.5:3b',
     maxTokens: 1024,
-    timeout: 15000,  // 15 сек максимум
+    timeout: 20000,
+    weight: 1,  // меньше ядер
   },
   quality: {
-    name: 'QUALITY',
+    name: 'QUALITY', 
     url: process.env.OLLAMA_QUALITY_URL || 'http://31.76.93.2:11434',
-    models: ['qwen2.5:7b'],
-    defaultModel: 'qwen2.5:7b',      // 7B - максимум что работает на CPU
-    complexModel: 'qwen2.5:7b',
-    // Только фоновые задачи (не real-time)
-    tasks: ['background', 'batch', 'training'],
-    maxTokens: 2048,
-    timeout: 60000,  // 1 минута для фоновых
+    models: ['qwen2.5:3b'],
+    defaultModel: 'qwen2.5:3b',
+    maxTokens: 1024,
+    timeout: 20000,
+    weight: 2,  // больше ядер - больше запросов
   },
 } as const
 
@@ -45,13 +40,17 @@ interface ServerHealth {
   lastCheck: number
   latency: number
   errorCount: number
+  activeRequests: number
   lastError?: string
 }
 
 const serverHealth: Record<ServerType, ServerHealth> = {
-  fast: { isHealthy: true, lastCheck: 0, latency: 0, errorCount: 0 },
-  quality: { isHealthy: true, lastCheck: 0, latency: 0, errorCount: 0 },
+  fast: { isHealthy: true, lastCheck: 0, latency: 0, errorCount: 0, activeRequests: 0 },
+  quality: { isHealthy: true, lastCheck: 0, latency: 0, errorCount: 0, activeRequests: 0 },
 }
+
+// Round-robin counter
+let roundRobinIndex = 0
 
 const HEALTH_CHECK_INTERVAL = 30000
 const MAX_ERRORS_BEFORE_UNHEALTHY = 3
@@ -80,6 +79,7 @@ export async function checkServerHealth(server: ServerType): Promise<boolean> {
     
     if (response.ok) {
       serverHealth[server] = {
+        ...serverHealth[server],
         isHealthy: true,
         lastCheck: now,
         latency: Date.now() - start,
@@ -115,52 +115,67 @@ export async function getAllServersHealth(): Promise<Record<ServerType, ServerHe
 }
 
 /**
- * Route task to appropriate server
+ * Load balancing: выбирает сервер с наименьшей нагрузкой
+ * Weighted round-robin с учетом активных запросов
  */
-export function getServerForTask(task: TaskType): ServerType {
-  if ((AI_SERVERS.fast.tasks as readonly string[]).includes(task)) {
-    return 'fast'
+export async function selectServer(): Promise<{
+  server: ServerType
+  config: typeof AI_SERVERS[ServerType]
+}> {
+  const servers: ServerType[] = ['fast', 'quality']
+  
+  // Проверяем здоровье обоих серверов
+  const healthChecks = await Promise.all(servers.map(s => checkServerHealth(s)))
+  const healthyServers = servers.filter((_, i) => healthChecks[i])
+  
+  if (healthyServers.length === 0) {
+    // Оба упали - пробуем quality (мощнее)
+    console.error('[AI Router] All servers unhealthy, trying quality')
+    return { server: 'quality', config: AI_SERVERS.quality }
   }
-  return 'quality'
+  
+  if (healthyServers.length === 1) {
+    // Один живой - используем его
+    const server = healthyServers[0]
+    return { server, config: AI_SERVERS[server] }
+  }
+  
+  // Оба живые - выбираем по нагрузке
+  const fastLoad = serverHealth.fast.activeRequests / AI_SERVERS.fast.weight
+  const qualityLoad = serverHealth.quality.activeRequests / AI_SERVERS.quality.weight
+  
+  // Выбираем сервер с меньшей относительной нагрузкой
+  // Или round-robin если нагрузка одинаковая
+  let selected: ServerType
+  
+  if (Math.abs(fastLoad - qualityLoad) < 0.5) {
+    // Нагрузка примерно равная - round-robin
+    roundRobinIndex++
+    selected = roundRobinIndex % 3 === 0 ? 'fast' : 'quality'  // 2:1 в пользу quality (мощнее)
+  } else {
+    selected = fastLoad < qualityLoad ? 'fast' : 'quality'
+  }
+  
+  return { server: selected, config: AI_SERVERS[selected] }
 }
 
 /**
- * Get best available server for task (with fallback)
+ * Get best available server (legacy compatibility)
  */
 export async function getBestServer(task: TaskType): Promise<{
   server: ServerType
   config: typeof AI_SERVERS[ServerType]
   isFallback: boolean
 }> {
-  const preferredServer = getServerForTask(task)
-  const preferredHealthy = await checkServerHealth(preferredServer)
-  
-  if (preferredHealthy) {
-    return {
-      server: preferredServer,
-      config: AI_SERVERS[preferredServer],
-      isFallback: false,
-    }
-  }
-  
-  const fallbackServer: ServerType = preferredServer === 'fast' ? 'quality' : 'fast'
-  const fallbackHealthy = await checkServerHealth(fallbackServer)
-  
-  if (fallbackHealthy) {
-    console.warn(`[AI Router] ${preferredServer} unhealthy, falling back to ${fallbackServer}`)
-    return {
-      server: fallbackServer,
-      config: AI_SERVERS[fallbackServer],
-      isFallback: true,
-    }
-  }
-  
-  console.error(`[AI Router] All servers unhealthy, trying ${preferredServer}`)
-  return {
-    server: preferredServer,
-    config: AI_SERVERS[preferredServer],
-    isFallback: false,
-  }
+  const { server, config } = await selectServer()
+  return { server, config, isFallback: false }
+}
+
+/**
+ * Route task to appropriate server (legacy - now all tasks go to load balancer)
+ */
+export function getServerForTask(task: TaskType): ServerType {
+  return 'quality'  // Doesn't matter - selectServer() handles it
 }
 
 // Message type
@@ -170,7 +185,7 @@ export interface RouterMessage {
 }
 
 /**
- * Generate completion using routed server
+ * Generate completion using load-balanced server
  */
 export async function routedGenerate(
   task: TaskType,
@@ -182,9 +197,12 @@ export async function routedGenerate(
     maxTokens?: number
   } = {}
 ): Promise<{ response: string; server: ServerType; model: string; latency: number }> {
-  const { server, config } = await getBestServer(task)
+  const { server, config } = await selectServer()
   const model = options.model || config.defaultModel
   const start = Date.now()
+  
+  // Track active request
+  serverHealth[server].activeRequests++
   
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), config.timeout)
@@ -228,11 +246,13 @@ export async function routedGenerate(
     clearTimeout(timeoutId)
     serverHealth[server].errorCount++
     throw error
+  } finally {
+    serverHealth[server].activeRequests--
   }
 }
 
 /**
- * Chat completion using routed server
+ * Chat completion using load-balanced server
  */
 export async function routedChat(
   task: TaskType,
@@ -244,9 +264,12 @@ export async function routedChat(
     maxTokens?: number
   } = {}
 ): Promise<{ response: string; server: ServerType; model: string; latency: number }> {
-  const { server, config } = await getBestServer(task)
+  const { server, config } = await selectServer()
   const model = options.model || config.defaultModel
   const start = Date.now()
+  
+  // Track active request
+  serverHealth[server].activeRequests++
   
   const allMessages = options.system
     ? [{ role: 'system' as const, content: options.system }, ...messages]
@@ -293,11 +316,13 @@ export async function routedChat(
     clearTimeout(timeoutId)
     serverHealth[server].errorCount++
     throw error
+  } finally {
+    serverHealth[server].activeRequests--
   }
 }
 
 /**
- * Streaming chat using routed server
+ * Streaming chat using load-balanced server
  */
 export async function* routedChatStream(
   task: TaskType,
@@ -309,8 +334,11 @@ export async function* routedChatStream(
     maxTokens?: number
   } = {}
 ): AsyncGenerator<string, void, unknown> {
-  const { server, config } = await getBestServer(task)
+  const { server, config } = await selectServer()
   const model = options.model || config.defaultModel
+  
+  // Track active request
+  serverHealth[server].activeRequests++
   
   const allMessages = options.system
     ? [{ role: 'system' as const, content: options.system }, ...messages]
@@ -368,6 +396,8 @@ export async function* routedChatStream(
     clearTimeout(timeoutId)
     serverHealth[server].errorCount++
     throw error
+  } finally {
+    serverHealth[server].activeRequests--
   }
 }
 
@@ -391,7 +421,7 @@ export interface GenerateOptions {
 }
 
 /**
- * Legacy generateResponse - now routes to appropriate server
+ * Legacy generateResponse - now routes to load balancer
  */
 export async function generateResponse(
   message: string,
@@ -403,10 +433,7 @@ export async function generateResponse(
     { role: 'user', content: message }
   ]
   
-  // Determine task type
   const task: TaskType = context.useRAG ? 'rag' : 'chat'
-  
-  // Build system prompt
   const systemPrompt = buildSystemPrompt(context)
   
   const result = await routedChat(task, messages, {
@@ -451,7 +478,7 @@ function buildSystemPrompt(context: ChatContext): string {
 }
 
 /**
- * Legacy streaming - now routes to appropriate server
+ * Legacy streaming - now routes to load balancer
  */
 export async function* streamResponse(
   message: string,
@@ -479,7 +506,7 @@ export async function* streamResponse(
  */
 export async function checkHealth(): Promise<{
   healthy: boolean
-  servers: Record<ServerType, { healthy: boolean; latency: number; models: string[] }>
+  servers: Record<ServerType, { healthy: boolean; latency: number; activeRequests: number; models: string[] }>
 }> {
   const health = await getAllServersHealth()
   
@@ -489,11 +516,13 @@ export async function checkHealth(): Promise<{
       fast: {
         healthy: health.fast.isHealthy,
         latency: health.fast.latency,
+        activeRequests: health.fast.activeRequests,
         models: AI_SERVERS.fast.models as unknown as string[],
       },
       quality: {
         healthy: health.quality.isHealthy,
         latency: health.quality.latency,
+        activeRequests: health.quality.activeRequests,
         models: AI_SERVERS.quality.models as unknown as string[],
       },
     },
