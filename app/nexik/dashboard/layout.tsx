@@ -44,8 +44,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const res = await fetch("/api/nexik/auth/session")
       if (res.ok) {
         const data = await res.json()
-        if (data.user) {
-          setUser(data.user)
+        if (data.session?.member) {
+          setUser({
+            id: data.session.member.id,
+            email: data.session.member.email,
+            name: data.session.member.name,
+            role: data.session.member.role,
+            org_id: data.session.org.id,
+            org_name: data.session.org.name
+          })
         } else {
           router.replace("/nexik/login")
         }

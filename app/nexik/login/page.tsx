@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
@@ -33,15 +33,26 @@ function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const error_param = searchParams.get('error')
-  const returnUrl = searchParams.get('returnUrl')
   
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<string | null>(null)
-  const [error, setError] = useState(error_param === 'server_error' ? 'Ошибка авторизации. Попробуйте еще раз.' : "")
+  const [error, setError] = useState(error_param === 'server_error' ? 'Ошибка авторизации' : "")
   const [focused, setFocused] = useState<string | null>(null)
+
+  // Check if already logged in
+  useEffect(() => {
+    fetch("/api/nexik/auth/session")
+      .then(res => res.json())
+      .then(data => {
+        if (data.session?.member) {
+          router.replace("/nexik/dashboard")
+        }
+      })
+      .catch(() => {})
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,7 +74,7 @@ function LoginContent() {
         return
       }
 
-      router.push(returnUrl || "/nexik/dashboard")
+      router.push("/nexik/dashboard")
     } catch {
       setError("Ошибка соединения")
       setLoading(false)
@@ -72,67 +83,101 @@ function LoginContent() {
 
   const handleOAuth = (provider: 'google' | 'yandex') => {
     setOauthLoading(provider)
-    const state = returnUrl ? encodeURIComponent(JSON.stringify({ returnUrl })) : ''
-    window.location.href = `/api/nexik/auth/oauth/${provider}${state ? `?state=${state}` : ''}`
+    window.location.href = `/api/nexik/auth/oauth/${provider}`
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
-      {/* Background */}
+    <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden">
+      {/* Animated background gradient */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-3xl" />
+        <motion.div 
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px]"
+          animate={{ 
+            scale: [1, 1.1, 1],
+            rotate: [0, 180, 360],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+        >
+          <div className="absolute inset-0 bg-gradient-radial from-cyan-500/10 via-transparent to-transparent blur-3xl" />
+        </motion.div>
       </div>
+
+      {/* Grid pattern */}
+      <div 
+        className="fixed inset-0 pointer-events-none opacity-[0.02]"
+        style={{
+          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                           linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+          backgroundSize: '60px 60px'
+        }}
+      />
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
         className="w-full max-w-sm relative z-10"
       >
         {/* Logo */}
-        <div className="flex justify-center mb-8">
-          <Link href="/nexik">
-            <SiriOrb size={56} state="idle" />
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="flex justify-center mb-10"
+        >
+          <Link href="/nexik" className="group">
+            <SiriOrb size={64} color="#00ffff" state="idle" />
           </Link>
-        </div>
+        </motion.div>
 
         {/* Title */}
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-white mb-2">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="text-center mb-8"
+        >
+          <h1 className="text-2xl font-medium text-white mb-2">
             Вход в Nexik
           </h1>
           <p className="text-zinc-500 text-sm">
             Управляйте вашим AI-ассистентом
           </p>
-        </div>
+        </motion.div>
 
         {/* OAuth buttons */}
-        <div className="space-y-3 mb-6">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.25 }}
+          className="flex gap-3 mb-6"
+        >
           <button
             onClick={() => handleOAuth('google')}
             disabled={!!oauthLoading}
-            className="w-full py-3 bg-white hover:bg-zinc-100 rounded-xl text-black font-medium flex items-center justify-center gap-3 transition-colors disabled:opacity-50"
+            className="flex-1 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {oauthLoading === 'google' ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <GoogleIcon className="w-5 h-5" />
             )}
-            <span>Продолжить с Google</span>
+            <span className="text-sm">Google</span>
           </button>
           
           <button
             onClick={() => handleOAuth('yandex')}
             disabled={!!oauthLoading}
-            className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-white font-medium flex items-center justify-center gap-3 transition-colors disabled:opacity-50"
+            className="flex-1 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {oauthLoading === 'yandex' ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <YandexIcon className="w-5 h-5" />
             )}
-            <span>Продолжить с Яндекс</span>
+            <span className="text-sm">Яндекс</span>
           </button>
-        </div>
+        </motion.div>
 
         {/* Divider */}
         <div className="flex items-center gap-4 mb-6">
@@ -142,7 +187,13 @@ function LoginContent() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <motion.form 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          onSubmit={handleSubmit} 
+          className="space-y-4"
+        >
           {/* Email */}
           <div className="relative">
             <input
@@ -151,10 +202,17 @@ function LoginContent() {
               onChange={(e) => setEmail(e.target.value)}
               onFocus={() => setFocused("email")}
               onBlur={() => setFocused(null)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50 transition-all text-sm"
+              className="w-full px-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:bg-white/[0.05] transition-all text-sm"
               placeholder="Email"
               required
             />
+            {focused === "email" && (
+              <motion.div 
+                layoutId="focus-ring"
+                className="absolute inset-0 rounded-xl border border-cyan-500/50 pointer-events-none"
+                transition={{ duration: 0.2 }}
+              />
+            )}
           </div>
 
           {/* Password */}
@@ -165,7 +223,7 @@ function LoginContent() {
               onChange={(e) => setPassword(e.target.value)}
               onFocus={() => setFocused("password")}
               onBlur={() => setFocused(null)}
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50 transition-all pr-12 text-sm"
+              className="w-full px-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:bg-white/[0.05] transition-all pr-12 text-sm"
               placeholder="Пароль"
               required
             />
@@ -176,6 +234,13 @@ function LoginContent() {
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
+            {focused === "password" && (
+              <motion.div 
+                layoutId="focus-ring"
+                className="absolute inset-0 rounded-xl border border-cyan-500/50 pointer-events-none"
+                transition={{ duration: 0.2 }}
+              />
+            )}
           </div>
 
           {/* Error */}
@@ -190,27 +255,34 @@ function LoginContent() {
           )}
 
           {/* Submit */}
-          <button
+          <motion.button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            className="w-full py-3.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
           >
             {loading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="animate-spin" size={18} />
                 <span>Вход...</span>
               </>
             ) : (
               <>
-                <span>Войти</span>
-                <ArrowRight size={16} />
+                <span>Продолжить</span>
+                <ArrowRight size={18} />
               </>
             )}
-          </button>
-        </form>
+          </motion.button>
+        </motion.form>
 
         {/* Links */}
-        <div className="mt-6 space-y-3 text-center">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="mt-8 space-y-4 text-center"
+        >
           <Link
             href="/nexik/forgot-password"
             className="text-sm text-zinc-500 hover:text-white transition-colors block"
@@ -222,22 +294,36 @@ function LoginContent() {
             Нет аккаунта?{" "}
             <Link
               href="/nexik/register"
-              className="text-cyan-400 hover:text-cyan-300 transition-colors"
+              className="text-white hover:text-cyan-400 transition-colors"
             >
               Создать
             </Link>
           </div>
-        </div>
+        </motion.div>
+
+        {/* Demo button */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="mt-8"
+        >
+          <Link
+            href="/nexik"
+            className="w-full py-3.5 border border-white/10 rounded-xl text-zinc-400 hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2 text-sm"
+          >
+            Попробовать без регистрации
+          </Link>
+        </motion.div>
       </motion.div>
     </div>
   )
 }
 
-// Loading fallback
 function LoadingFallback() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-      <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-white/50" />
     </div>
   )
 }
