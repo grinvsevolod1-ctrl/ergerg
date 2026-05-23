@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { classifyBusiness } from '@/lib/ai/classifier'
 import { routedChat, AI_SERVERS } from '@/lib/ai/router'
 import { buildNexikPrompt, NEXIK_PERSONA_QUICK } from '@/lib/nexik/persona'
+import { query } from '@/lib/db'
 import {
   getOrCreateVisitor,
   updateVisitor,
@@ -13,6 +14,32 @@ import {
   extractPromises,
   generateVisitorContext
 } from '@/lib/nexik/memory'
+
+/**
+ * Get relevant training examples for similar messages
+ */
+async function getTrainingExamples(intent: string, limit: number = 3): Promise<string> {
+  try {
+    const result = await query<{ user_message: string; ideal_response: string }>(
+      `SELECT user_message, ideal_response 
+       FROM nexik_training_examples 
+       WHERE intent = $1 AND quality_score >= 4
+       ORDER BY quality_score DESC, created_at DESC
+       LIMIT $2`,
+      [intent, limit]
+    )
+    
+    if (result.rows.length === 0) return ''
+    
+    let examples = '\n\n=== ХОРОШИЕ ПРИМЕРЫ ОТВЕТОВ ===\n'
+    for (const row of result.rows) {
+      examples += `Юзер: ${row.user_message}\nТы: ${row.ideal_response}\n\n`
+    }
+    return examples
+  } catch {
+    return ''
+  }
+}
 
 /**
  * NEXIK v3.0 API
@@ -230,7 +257,10 @@ export async function POST(request: NextRequest) {
 Коротко, без лишних слов.`
     }
     
-    const fullPrompt = systemPrompt + '\n\n=== ТЕКУЩАЯ ЗАДАЧА ===\n' + intentGuidance
+    // Get training examples for this intent
+    const trainingExamples = await getTrainingExamples(intent)
+    
+    const fullPrompt = systemPrompt + '\n\n=== ТЕКУЩАЯ ЗАДАЧА ===\n' + intentGuidance + trainingExamples
     
     // Call AI with timeout
     try {
