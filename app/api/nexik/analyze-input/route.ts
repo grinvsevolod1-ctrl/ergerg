@@ -68,12 +68,20 @@ function detectIntent(input: string): MessageIntent {
     return 'simulate_sales'
   }
   
-  // Greetings
-  if (/^(привет|хай|здравствуй|добрый|hello|hi|йо|здарова|салам|ку|приветик)/.test(lower)) {
+  // Greetings - только если это ТОЛЬКО приветствие
+  if (/^(привет|хай|здравствуй|добрый|hello|hi|йо|здарова|салам|ку|приветик)[!.,\s]*$/i.test(lower)) {
+    return 'greeting'
+  }
+  
+  // Greeting + question about Nexik
+  if (/^(привет|хай|здравствуй|добрый|hello|hi|йо|здарова|салам|ку|приветик)/i.test(lower)) {
     if (/расскаж|что (ты|умеешь|можешь)|кто ты|о себе/.test(lower)) {
       return 'about_nexik'
     }
-    return 'greeting'
+    // Greeting + something else = general chat
+    if (lower.length > 15) {
+      return 'general_chat'
+    }
   }
   
   // Questions about Nexik
@@ -117,15 +125,15 @@ function detectIntent(input: string): MessageIntent {
     return 'rude'
   }
   
-  // Off-topic questions
+  // Off-topic but still answer
   if (/погода|политика|новости|анекдот|шутка|курс|доллар/.test(lower)) {
+    return 'general_chat'
+  }
+  
   // General chat - anything else that's not rude
   if (lower.length > 5) {
     return 'general_chat'
   }
-  
-  return 'unclear'
-}
   
   return 'unclear'
 }
