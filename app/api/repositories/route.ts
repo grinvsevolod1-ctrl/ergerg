@@ -1,7 +1,5 @@
-import { neon } from '@neondatabase/serverless'
+import { query } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
-
-const sql = neon(process.env.DATABASE_URL!)
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,8 +14,26 @@ export async function GET(request: NextRequest) {
     const safeSort = validSortColumns.includes(sortBy) ? sortBy : 'total_commits'
     
     // Get repositories with aggregated metrics
-    const repositories = await sql`
-      SELECT 
+    const repositories = await query<{
+      id: number
+      name: string
+      description: string | null
+      url: string
+      default_branch: string
+      is_active: boolean
+      created_at: Date
+      updated_at: Date
+      total_commits: number
+      total_prs: number
+      total_prs_merged: number
+      total_issues: number
+      total_issues_closed: number
+      total_lines_added: number
+      total_lines_removed: number
+      contributors_count: number
+      last_activity: Date | null
+    }>(
+      `SELECT 
         r.id,
         r.name,
         r.description,
@@ -39,27 +55,17 @@ export async function GET(request: NextRequest) {
       LEFT JOIN daily_metrics dm ON r.id = dm.repository_id
       WHERE r.is_active = true
       GROUP BY r.id
-      ORDER BY 
-        CASE WHEN ${safeSort} = 'name' AND ${order} = 'ASC' THEN r.name END ASC,
-        CASE WHEN ${safeSort} = 'name' AND ${order} = 'DESC' THEN r.name END DESC,
-        CASE WHEN ${safeSort} = 'total_commits' AND ${order} = 'DESC' THEN COALESCE(SUM(dm.commits), 0) END DESC,
-        CASE WHEN ${safeSort} = 'total_commits' AND ${order} = 'ASC' THEN COALESCE(SUM(dm.commits), 0) END ASC,
-        CASE WHEN ${safeSort} = 'total_prs' AND ${order} = 'DESC' THEN COALESCE(SUM(dm.pull_requests_opened), 0) END DESC,
-        CASE WHEN ${safeSort} = 'total_prs' AND ${order} = 'ASC' THEN COALESCE(SUM(dm.pull_requests_opened), 0) END ASC,
-        CASE WHEN ${safeSort} = 'total_issues' AND ${order} = 'DESC' THEN COALESCE(SUM(dm.issues_opened), 0) END DESC,
-        CASE WHEN ${safeSort} = 'total_issues' AND ${order} = 'ASC' THEN COALESCE(SUM(dm.issues_opened), 0) END ASC,
-        CASE WHEN ${safeSort} = 'contributors_count' AND ${order} = 'DESC' THEN COUNT(DISTINCT dm.contributor_id) END DESC,
-        CASE WHEN ${safeSort} = 'contributors_count' AND ${order} = 'ASC' THEN COUNT(DISTINCT dm.contributor_id) END ASC,
-        CASE WHEN ${safeSort} = 'last_activity' AND ${order} = 'DESC' THEN MAX(dm.date) END DESC NULLS LAST,
-        CASE WHEN ${safeSort} = 'last_activity' AND ${order} = 'ASC' THEN MAX(dm.date) END ASC NULLS LAST
-      LIMIT ${limit}
-      OFFSET ${offset}
-    `
+      ORDER BY ${safeSort} ${order}
+      LIMIT $1
+      OFFSET $2`,
+      [limit, offset]
+    )
     
     // Get total count
-    const countResult = await sql`
-      SELECT COUNT(*)::int as total FROM repositories WHERE is_active = true
-    `
+    const countResult = await query<{ total: number }>(
+      'SELECT COUNT(*)::int as total FROM repositories WHERE is_active = true',
+      []
+    )
     
     return NextResponse.json({
       repositories,
@@ -71,7 +77,7 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('[v0] Error fetching repositories:', error)
+    console.error('[Repositories API] Error fetching:', error)
     return NextResponse.json(
       { error: 'Failed to fetch repositories' },
       { status: 500 }
@@ -91,20 +97,21 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const result = await sql`
-      INSERT INTO repositories (name, description, url, default_branch)
-      VALUES (${name}, ${description || null}, ${url}, ${default_branch})
-      ON CONFLICT (name) DO UPDATE SET
-        description = EXCLUDED.description,
-        url = EXCLUDED.url,
-        default_branch = EXCLUDED.default_branch,
-        updated_at = CURRENT_TIMESTAMP
-      RETURNING *
-    `
+    const result = await query<{ id: number; name: string; url: string }>(
+      `INSERT INTO repositories (name, description, url, default_branch)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (name) DO UPDATE SET
+         description = EXCLUDED.description,
+         url = EXCLUDED.url,
+         default_branch = EXCLUDED.default_branch,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [name, description || null, url, default_branch]
+    )
     
     return NextResponse.json(result[0], { status: 201 })
   } catch (error) {
-    console.error('[v0] Error creating repository:', error)
+    console.error('[Repositories API] Error creating:', error)
     return NextResponse.json(
       { error: 'Failed to create repository' },
       { status: 500 }

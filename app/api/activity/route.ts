@@ -1,7 +1,18 @@
-import { neon } from '@neondatabase/serverless'
+import { query } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
-const sql = neon(process.env.DATABASE_URL!)
+interface Activity {
+  id: number
+  type: string
+  title: string
+  description: string | null
+  url: string | null
+  metadata: Record<string, unknown> | null
+  created_at: Date
+  contributor_username: string
+  contributor_avatar: string | null
+  repository_name: string
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,17 +21,12 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0')
     const contributorId = searchParams.get('contributor_id')
     const repositoryId = searchParams.get('repository_id')
-    const type = searchParams.get('type')
     
-    // Validate activity type
-    const validTypes = ['commit', 'pull_request', 'issue', 'review', 'merge']
-    const safeType = type && validTypes.includes(type) ? type : null
+    let activities: Activity[]
     
-    let activities
-    
-    if (contributorId && repositoryId && safeType) {
-      activities = await sql`
-        SELECT 
+    if (contributorId && repositoryId) {
+      activities = await query<Activity>(
+        `SELECT 
           a.id,
           a.type,
           a.title,
@@ -34,38 +40,16 @@ export async function GET(request: NextRequest) {
         FROM activity_log a
         JOIN contributors c ON a.contributor_id = c.id
         JOIN repositories r ON a.repository_id = r.id
-        WHERE a.contributor_id = ${parseInt(contributorId)}
-          AND a.repository_id = ${parseInt(repositoryId)}
-          AND a.type = ${safeType}
+        WHERE a.contributor_id = $1
+          AND a.repository_id = $2
         ORDER BY a.created_at DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `
-    } else if (contributorId && repositoryId) {
-      activities = await sql`
-        SELECT 
-          a.id,
-          a.type,
-          a.title,
-          a.description,
-          a.url,
-          a.metadata,
-          a.created_at,
-          c.username as contributor_username,
-          c.avatar_url as contributor_avatar,
-          r.name as repository_name
-        FROM activity_log a
-        JOIN contributors c ON a.contributor_id = c.id
-        JOIN repositories r ON a.repository_id = r.id
-        WHERE a.contributor_id = ${parseInt(contributorId)}
-          AND a.repository_id = ${parseInt(repositoryId)}
-        ORDER BY a.created_at DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `
+        LIMIT $3
+        OFFSET $4`,
+        [parseInt(contributorId), parseInt(repositoryId), limit, offset]
+      )
     } else if (contributorId) {
-      activities = await sql`
-        SELECT 
+      activities = await query<Activity>(
+        `SELECT 
           a.id,
           a.type,
           a.title,
@@ -79,14 +63,15 @@ export async function GET(request: NextRequest) {
         FROM activity_log a
         JOIN contributors c ON a.contributor_id = c.id
         JOIN repositories r ON a.repository_id = r.id
-        WHERE a.contributor_id = ${parseInt(contributorId)}
+        WHERE a.contributor_id = $1
         ORDER BY a.created_at DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `
+        LIMIT $2
+        OFFSET $3`,
+        [parseInt(contributorId), limit, offset]
+      )
     } else if (repositoryId) {
-      activities = await sql`
-        SELECT 
+      activities = await query<Activity>(
+        `SELECT 
           a.id,
           a.type,
           a.title,
@@ -100,35 +85,15 @@ export async function GET(request: NextRequest) {
         FROM activity_log a
         JOIN contributors c ON a.contributor_id = c.id
         JOIN repositories r ON a.repository_id = r.id
-        WHERE a.repository_id = ${parseInt(repositoryId)}
+        WHERE a.repository_id = $1
         ORDER BY a.created_at DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `
-    } else if (safeType) {
-      activities = await sql`
-        SELECT 
-          a.id,
-          a.type,
-          a.title,
-          a.description,
-          a.url,
-          a.metadata,
-          a.created_at,
-          c.username as contributor_username,
-          c.avatar_url as contributor_avatar,
-          r.name as repository_name
-        FROM activity_log a
-        JOIN contributors c ON a.contributor_id = c.id
-        JOIN repositories r ON a.repository_id = r.id
-        WHERE a.type = ${safeType}
-        ORDER BY a.created_at DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `
+        LIMIT $2
+        OFFSET $3`,
+        [parseInt(repositoryId), limit, offset]
+      )
     } else {
-      activities = await sql`
-        SELECT 
+      activities = await query<Activity>(
+        `SELECT 
           a.id,
           a.type,
           a.title,
@@ -143,15 +108,17 @@ export async function GET(request: NextRequest) {
         JOIN contributors c ON a.contributor_id = c.id
         JOIN repositories r ON a.repository_id = r.id
         ORDER BY a.created_at DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `
+        LIMIT $1
+        OFFSET $2`,
+        [limit, offset]
+      )
     }
     
     // Get total count
-    const countResult = await sql`
-      SELECT COUNT(*)::int as total FROM activity_log
-    `
+    const countResult = await query<{ total: number }>(
+      'SELECT COUNT(*)::int as total FROM activity_log',
+      []
+    )
     
     return NextResponse.json({
       activities,
@@ -163,7 +130,7 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('[v0] Error fetching activities:', error)
+    console.error('[Activity API] Error fetching:', error)
     return NextResponse.json(
       { error: 'Failed to fetch activities' },
       { status: 500 }
@@ -192,23 +159,24 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const result = await sql`
-      INSERT INTO activity_log (contributor_id, repository_id, type, title, description, url, metadata)
-      VALUES (
-        ${contributor_id}, 
-        ${repository_id}, 
-        ${type}, 
-        ${title}, 
-        ${description || null}, 
-        ${url || null}, 
-        ${metadata ? JSON.stringify(metadata) : null}
-      )
-      RETURNING *
-    `
+    const result = await query<Activity>(
+      `INSERT INTO activity_log (contributor_id, repository_id, type, title, description, url, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        contributor_id, 
+        repository_id, 
+        type, 
+        title, 
+        description || null, 
+        url || null, 
+        metadata ? JSON.stringify(metadata) : null
+      ]
+    )
     
     return NextResponse.json(result[0], { status: 201 })
   } catch (error) {
-    console.error('[v0] Error creating activity:', error)
+    console.error('[Activity API] Error creating:', error)
     return NextResponse.json(
       { error: 'Failed to create activity' },
       { status: 500 }
