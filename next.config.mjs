@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // output: 'standalone', // Disabled - use pnpm start instead
   typescript: {
     ignoreBuildErrors: true,
   },
