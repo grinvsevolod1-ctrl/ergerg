@@ -130,12 +130,13 @@ function detectIntent(input: string): MessageIntent {
     return 'general_chat'
   }
   
-  // General chat - anything else that's not rude
-  if (lower.length > 5) {
+  // Math expressions - answer them
+  if (/[\d+\-*/=]/.test(lower)) {
     return 'general_chat'
   }
   
-  return 'unclear'
+  // General chat - anything else (removed length check - answer EVERYTHING)
+  return 'general_chat'
 }
 
 export async function POST(request: NextRequest) {
