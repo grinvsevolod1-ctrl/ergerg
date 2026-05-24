@@ -333,6 +333,32 @@ export async function routedChat(
 }
 
 /**
+ * Simple AI response getter - convenience wrapper for routedChat
+ * Used by onboarding, personal chat, and other features
+ */
+export async function getAIResponse(
+  prompt: string,
+  options?: {
+    system?: string
+    model?: string
+    temperature?: number
+    maxTokens?: number
+  }
+): Promise<string> {
+  const result = await routedChat(
+    'chat',
+    [{ role: 'user', content: prompt }],
+    {
+      system: options?.system,
+      model: options?.model,
+      temperature: options?.temperature,
+      maxTokens: options?.maxTokens,
+    }
+  )
+  return result.response
+}
+
+/**
  * Add a new server at runtime (for dynamic scaling)
  */
 export function addServer(key: string, config: AIServerConfig): void {
