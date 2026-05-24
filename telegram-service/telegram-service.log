@@ -1,0 +1,5 @@
+nohup: ignoring input
+Traceback (most recent call last):
+  File "/var/www/netnext-new/telegram-service/service.py", line 14, in <module>
+    from cryptography.fernet import Fernet
+ModuleNotFoundError: No module named 'cryptography'

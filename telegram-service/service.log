@@ -1,0 +1,68 @@
+nohup: ignoring input
+INFO:aiohttp.access:::1 [24/May/2026:15:54:14 +0000] "GET /ping HTTP/1.1" 200 174 "-" "curl/8.5.0"
+INFO:__main__:Sending code to +123
+INFO:telethon.network.mtprotosender:Connecting to 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.167.51:443/TcpFull complete!
+ERROR:__main__:Send code error: The phone number is invalid (caused by SendCodeRequest)
+INFO:aiohttp.access:::1 [24/May/2026:15:54:14 +0000] "POST /send-code HTTP/1.1" 400 235 "-" "curl/8.5.0"
+INFO:__main__:Sending code to +375291414555
+INFO:telethon.network.mtprotosender:Connecting to 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.167.51:443/TcpFull complete!
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:15:54:23 +0000] "POST /send-code HTTP/1.1" 200 216 "-" "node"
+INFO:__main__:Signing in with code for +375291414555
+INFO:__main__:2FA required for +375291414555
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:15:54:28 +0000] "POST /sign-in HTTP/1.1" 200 198 "-" "node"
+INFO:__main__:Signing in with 2FA for +375291414555
+ERROR:__main__:Sign in error: The password (and thus its hash value) you entered is invalid (caused by CheckPasswordRequest)
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:15:54:31 +0000] "POST /sign-in HTTP/1.1" 400 275 "-" "node"
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:16:56:57 +0000] "GET /ping HTTP/1.1" 200 174 "-" "curl/8.5.0"
+INFO:__main__:Sending code to +123456789
+INFO:telethon.network.mtprotosender:Connecting to 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.167.51:443/TcpFull complete!
+ERROR:__main__:Send code error: The phone number is invalid (caused by SendCodeRequest)
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:16:57:01 +0000] "POST /send-code HTTP/1.1" 400 235 "-" "curl/8.5.0"
+INFO:__main__:Sending code to +375445749855
+INFO:telethon.network.mtprotosender:Connecting to 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.167.51:443/TcpFull complete!
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:16:58:07 +0000] "POST /send-code HTTP/1.1" 200 216 "-" "curl/8.5.0"
+INFO:__main__:Sending code to +375445749855
+INFO:telethon.network.mtprotosender:Connecting to 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.167.51:443/TcpFull complete!
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:16:58:37 +0000] "POST /send-code HTTP/1.1" 200 216 "-" "node"
+INFO:__main__:Signing in with code for +375445749855
+INFO:__main__:2FA required for +375445749855
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:16:58:43 +0000] "POST /sign-in HTTP/1.1" 200 198 "-" "node"
+INFO:__main__:Signing in with 2FA for +375445749855
+INFO:telethon.network.mtprotosender:Disconnecting from 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Disconnection from 149.154.167.51:443/TcpFull complete!
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:16:58:47 +0000] "POST /sign-in HTTP/1.1" 200 766 "-" "node"
+INFO:aiohttp.access:::1 [24/May/2026:17:03:13 +0000] "POST /send-message HTTP/1.1" 404 173 "-" "curl/8.5.0"
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:17:15:36 +0000] "GET /ping HTTP/1.1" 200 174 "-" "curl/8.5.0"
+INFO:__main__:Sending code to +18166806339
+INFO:telethon.network.mtprotosender:Connecting to 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.167.51:443/TcpFull complete!
+INFO:telethon.client.users:Phone migrated to 1
+INFO:telethon.client.telegrambaseclient:Reconnecting to new data center 1
+INFO:telethon.network.mtprotosender:Disconnecting from 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Disconnection from 149.154.167.51:443/TcpFull complete!
+INFO:telethon.network.mtprotosender:Connecting to 149.154.175.60:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.175.60:443/TcpFull complete!
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:17:16:48 +0000] "POST /send-code HTTP/1.1" 200 216 "-" "node"
+INFO:__main__:Signing in with code for +18166806339
+INFO:telethon.network.mtprotosender:Disconnecting from 149.154.175.60:443/TcpFull...
+INFO:telethon.network.mtprotosender:Disconnection from 149.154.175.60:443/TcpFull complete!
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:17:17:02 +0000] "POST /sign-in HTTP/1.1" 200 766 "-" "node"
+INFO:__main__:Sending code to +18166806339
+INFO:telethon.network.mtprotosender:Connecting to 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.167.51:443/TcpFull complete!
+INFO:telethon.client.users:Phone migrated to 1
+INFO:telethon.client.telegrambaseclient:Reconnecting to new data center 1
+INFO:telethon.network.mtprotosender:Disconnecting from 149.154.167.51:443/TcpFull...
+INFO:telethon.network.mtprotosender:Disconnection from 149.154.167.51:443/TcpFull complete!
+INFO:telethon.network.mtprotosender:Connecting to 149.154.175.60:443/TcpFull...
+INFO:telethon.network.mtprotosender:Connection to 149.154.175.60:443/TcpFull complete!
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:17:18:44 +0000] "POST /send-code HTTP/1.1" 200 216 "-" "node"
+INFO:__main__:Signing in with code for +18166806339
+INFO:telethon.network.mtprotosender:Disconnecting from 149.154.175.60:443/TcpFull...
+INFO:telethon.network.mtprotosender:Disconnection from 149.154.175.60:443/TcpFull complete!
+INFO:aiohttp.access:127.0.0.1 [24/May/2026:17:18:55 +0000] "POST /sign-in HTTP/1.1" 200 766 "-" "node"
