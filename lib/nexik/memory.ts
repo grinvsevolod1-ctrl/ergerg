@@ -46,13 +46,16 @@ export interface MemoryMessage {
  */
 export async function getOrCreateVisitor(visitorId: string): Promise<VisitorMemory> {
   try {
+    console.log('[v0] getOrCreateVisitor called with:', visitorId)
     // Попробуем найти существующего
     const result = await query<VisitorMemory>(
       `SELECT * FROM nexik_visitors WHERE visitor_id = $1`,
       [visitorId]
     )
     
-    if (result && result.length > 0) {
+    console.log('[v0] query result type:', typeof result, 'isArray:', Array.isArray(result), 'value:', result)
+    
+    if (result && Array.isArray(result) && result.length > 0) {
       const row = result[0]
       // Обновляем last_seen
       await execute(
@@ -214,6 +217,7 @@ export async function getRecentMessages(
   limit: number = 20
 ): Promise<MemoryMessage[]> {
   try {
+    console.log('[v0] getRecentMessages called with:', visitorId)
     const result = await query<{
       role: 'user' | 'assistant'
       content: string
@@ -229,7 +233,9 @@ export async function getRecentMessages(
       [visitorId, limit]
     )
     
-    if (!result || result.length === 0) return []
+    console.log('[v0] getRecentMessages result:', typeof result, Array.isArray(result), result?.length)
+    
+    if (!result || !Array.isArray(result) || result.length === 0) return []
     
     return result.reverse().map(row => ({
       role: row.role,
@@ -249,6 +255,7 @@ export async function getRecentMessages(
  */
 export async function getActivePromises(visitorId: string): Promise<string[]> {
   try {
+    console.log('[v0] getActivePromises called with:', visitorId)
     const result = await query<{ promises: string[] }>(
       `SELECT promises FROM nexik_messages 
        WHERE visitor_id = $1 AND role = 'assistant' AND promises != '{}'
@@ -257,7 +264,9 @@ export async function getActivePromises(visitorId: string): Promise<string[]> {
       [visitorId]
     )
     
-    if (!result || result.length === 0) return []
+    console.log('[v0] getActivePromises result:', typeof result, Array.isArray(result), result?.length)
+    
+    if (!result || !Array.isArray(result) || result.length === 0) return []
     
     const allPromises: string[] = []
     for (const row of result) {
