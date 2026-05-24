@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowRight, Loader2, ArrowLeft, Check } from "lucide-react"
-import { getBusinessContext } from "@/lib/nexik/services/unified-memory"
+import { SiriOrb } from "@/components/nexik/siri-orb"
 
 // Google icon
 function GoogleIcon({ className }: { className?: string }) {
@@ -23,18 +23,9 @@ function GoogleIcon({ className }: { className?: string }) {
 function YandexIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none">
-      <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12z" fill="#FC3F1D"/>
-      <path d="M13.643 18.5h-2.286V9.214c-.857 0-2.143.429-2.143 2.143s.857 2.143 2.143 2.143v2.286c-2.571 0-4.429-1.857-4.429-4.429 0-2.571 1.857-4.428 4.429-4.428h2.286V18.5z" fill="#fff"/>
+      <circle cx="12" cy="12" r="12" fill="#FC3F1D"/>
+      <path d="M13.32 7.666h-.924c-1.694 0-2.585.858-2.585 2.123 0 1.43.616 2.1 1.881 2.959l1.045.704-3.003 4.487H7.49l2.695-4.014c-1.55-1.111-2.42-2.19-2.42-4.015 0-2.288 1.595-3.85 4.62-3.85h3.003v11.868H13.32V7.666z" fill="#fff"/>
     </svg>
-  )
-}
-
-// Loading fallback
-function RegisterLoading() {
-  return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <Loader2 className="w-8 h-8 animate-spin text-white/50" />
-    </div>
   )
 }
 
@@ -48,38 +39,28 @@ function RegisterContent() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [platform, setPlatform] = useState<string | null>(null)
   const [resendTimer, setResendTimer] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
-  // Get platform from URL or business context
+  // Check if already logged in
   useEffect(() => {
-    const urlPlatform = searchParams.get("platform")
-    if (urlPlatform) {
-      setPlatform(urlPlatform)
-    } else {
-      const ctx = getBusinessContext()
-      if (ctx?.platforms?.length) {
-        setPlatform(ctx.platforms[0])
-      }
-    }
-    
-    // Check for OAuth errors
-    const urlError = searchParams.get("error")
-    if (urlError) {
-      setError(urlError === "oauth_denied" ? "Авторизация отменена" : "Ошибка авторизации")
-    }
-  }, [searchParams])
+    fetch("/api/nexik/auth/session")
+      .then(res => res.json())
+      .then(data => {
+        if (data.authenticated) {
+          router.replace("/nexik/dashboard")
+        }
+      })
+      .catch(() => {})
+  }, [router])
 
-  // Focus email input on mount
   useEffect(() => {
     if (step === "email") {
       inputRef.current?.focus()
     }
   }, [step])
 
-  // Resend timer
   useEffect(() => {
     if (resendTimer > 0) {
       const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000)
@@ -87,7 +68,6 @@ function RegisterContent() {
     }
   }, [resendTimer])
 
-  // Handle OTP input
   const handleOtpChange = (index: number, value: string) => {
     if (value.length > 1) value = value[value.length - 1]
     if (!/^\d*$/.test(value)) return
@@ -96,18 +76,15 @@ function RegisterContent() {
     newOtp[index] = value
     setOtp(newOtp)
 
-    // Auto-focus next input
     if (value && index < 5) {
       otpRefs.current[index + 1]?.focus()
     }
 
-    // Auto-submit when complete
     if (value && index === 5 && newOtp.every(d => d)) {
       verifyOtp(newOtp.join(""))
     }
   }
 
-  // Handle OTP paste
   const handleOtpPaste = (e: React.ClipboardEvent) => {
     e.preventDefault()
     const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)
@@ -117,37 +94,28 @@ function RegisterContent() {
     }
   }
 
-  // Handle OTP backspace
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       otpRefs.current[index - 1]?.focus()
     }
   }
 
-  // Google OAuth
   const handleGoogleAuth = () => {
-    setLoading(true)
-    const state = encodeURIComponent(JSON.stringify({ platform, returnUrl: "/nexik/connect/instagram" }))
-    window.location.href = `/api/nexik/auth/oauth/google?state=${state}`
+    window.location.href = `/api/nexik/auth/oauth/google`
   }
 
-  // Yandex OAuth
   const handleYandexAuth = () => {
-    setLoading(true)
-    const state = encodeURIComponent(JSON.stringify({ platform, returnUrl: "/nexik/connect/instagram" }))
-    window.location.href = `/api/nexik/auth/oauth/yandex?state=${state}`
+    window.location.href = `/api/nexik/auth/oauth/yandex`
   }
 
-  // Send OTP to email
   const sendOtp = async (e?: React.FormEvent) => {
     e?.preventDefault()
-    
+
     if (!email) {
       setError("Введите email")
       return
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       setError("Введите корректный email")
@@ -182,7 +150,6 @@ function RegisterContent() {
     }
   }
 
-  // Verify OTP
   const verifyOtp = async (code?: string) => {
     const otpCode = code || otp.join("")
     if (otpCode.length !== 6) return
@@ -194,7 +161,7 @@ function RegisterContent() {
       const res = await fetch("/api/nexik/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: otpCode, platform }),
+        body: JSON.stringify({ email, code: otpCode }),
       })
 
       const data = await res.json()
@@ -208,14 +175,9 @@ function RegisterContent() {
       }
 
       setStep("success")
-      
-      // Redirect after success
+
       setTimeout(() => {
-        if (platform === "instagram") {
-          router.push("/nexik/connect/instagram")
-        } else {
-          router.push("/nexik/dashboard")
-        }
+        router.push("/nexik/dashboard")
       }, 1500)
     } catch {
       setError("Ошибка сети")
@@ -224,7 +186,6 @@ function RegisterContent() {
     }
   }
 
-  // Resend OTP
   const resendOtp = async () => {
     if (resendTimer > 0) return
     await sendOtp()
@@ -232,7 +193,6 @@ function RegisterContent() {
 
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
-      {/* Back button */}
       <motion.button
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -243,34 +203,36 @@ function RegisterContent() {
         <span className="text-sm">Назад</span>
       </motion.button>
 
+      <div className="text-center mb-8">
+        <div className="flex justify-center mb-6">
+          <SiriOrb size={56} color="#00ffff" state="idle" />
+        </div>
+        <motion.h1
+          className="text-2xl font-semibold text-white mb-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {step === "success" ? "Готово!" : step === "otp" ? "Введите код" : "Регистрация"}
+        </motion.h1>
+        <motion.p
+          className="text-white/50 text-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, transition: { delay: 0.1 } }}
+        >
+          {step === "success"
+            ? "Аккаунт создан"
+            : step === "otp"
+              ? `Код отправлен на ${email}`
+              : "Зарегистрируйтесь чтобы начать использовать Nexik"
+          }
+        </motion.p>
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-sm"
       >
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <motion.h1 
-            className="text-2xl font-semibold text-white mb-2"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            {step === "success" ? "Готово!" : step === "otp" ? "Введите код" : "Создать аккаунт"}
-          </motion.h1>
-          <motion.p 
-            className="text-white/50 text-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: { delay: 0.1 } }}
-          >
-            {step === "success" 
-              ? "Аккаунт создан" 
-              : step === "otp" 
-                ? `Код отправлен на ${email}`
-                : "Войдите чтобы начать использовать Nexik"
-            }
-          </motion.p>
-        </div>
-
         <AnimatePresence mode="wait">
           {step === "email" && (
             <motion.div
@@ -278,51 +240,48 @@ function RegisterContent() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
+              className="space-y-6"
             >
-              {/* Email form */}
-              <form onSubmit={sendOtp} className="space-y-4">
-                <div>
-                  <input
-                    ref={inputRef}
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value)
-                      setError("")
-                    }}
-                    placeholder="email@example.com"
-                    className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all"
-                    autoComplete="email"
-                  />
-                </div>
-
-                {error && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-red-400 text-sm text-center"
-                  >
-                    {error}
-                  </motion.p>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={loading || !email}
-                  className="w-full h-12 bg-white text-black font-medium rounded-lg hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      Продолжить
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
+              <form onSubmit={sendOtp}>
+                <input
+                  ref={inputRef}
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setError("")
+                  }}
+                  placeholder="email@example.com"
+                  className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all"
+                  autoComplete="email"
+                />
               </form>
 
-              {/* Divider */}
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-red-400 text-sm text-center"
+                >
+                  {error}
+                </motion.p>
+              )}
+
+              <button
+                onClick={sendOtp}
+                disabled={loading || !email}
+                className="w-full h-12 bg-white text-black font-medium rounded-lg hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    Продолжить
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-white/10"></div>
@@ -332,7 +291,6 @@ function RegisterContent() {
                 </div>
               </div>
 
-              {/* Social login buttons */}
               <div className="flex gap-3">
                 <button
                   onClick={handleGoogleAuth}
@@ -353,16 +311,7 @@ function RegisterContent() {
                 </button>
               </div>
 
-              {/* Terms */}
-              <p className="text-white/30 text-xs text-center mt-6">
-                Продолжая, вы соглашаетесь с{" "}
-                <Link href="/terms" className="text-white/50 hover:text-white/70 underline">
-                  условиями использования
-                </Link>
-              </p>
-
-              {/* Login link */}
-              <p className="text-white/50 text-sm text-center mt-4">
+              <p className="text-white/50 text-sm text-center">
                 Уже есть аккаунт?{" "}
                 <Link href="/nexik/login" className="text-white hover:underline">
                   Войти
@@ -379,7 +328,6 @@ function RegisterContent() {
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
-              {/* OTP inputs */}
               <div className="flex justify-center gap-2 sm:gap-3">
                 {otp.map((digit, index) => (
                   <input
@@ -414,7 +362,6 @@ function RegisterContent() {
                 </div>
               )}
 
-              {/* Resend */}
               <div className="text-center">
                 {resendTimer > 0 ? (
                   <p className="text-white/40 text-sm">
@@ -430,6 +377,13 @@ function RegisterContent() {
                   </button>
                 )}
               </div>
+
+              <button
+                onClick={() => setStep("email")}
+                className="text-white/40 text-sm text-center w-full hover:text-white/60 transition-colors"
+              >
+                ← Изменить email
+              </button>
             </motion.div>
           )}
 
@@ -453,6 +407,14 @@ function RegisterContent() {
           )}
         </AnimatePresence>
       </motion.div>
+    </div>
+  )
+}
+
+function RegisterLoading() {
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-white/50" />
     </div>
   )
 }

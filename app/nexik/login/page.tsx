@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, Suspense, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { motion } from "framer-motion"
-import { Eye, EyeOff, ArrowRight, Loader2 } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { ArrowRight, Loader2, ArrowLeft } from "lucide-react"
 import { SiriOrb } from "@/components/nexik/siri-orb"
 
 // Google icon
@@ -23,304 +23,365 @@ function GoogleIcon({ className }: { className?: string }) {
 function YandexIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none">
-      <path d="M12 24c6.627 0 12-5.373 12-12S18.627 0 12 0 0 5.373 0 12s5.373 12 12 12z" fill="#FC3F1D"/>
-      <path d="M13.643 18.5h-2.286V9.214c-.857 0-2.143.429-2.143 2.143s.857 2.143 2.143 2.143v2.286c-2.571 0-4.429-1.857-4.429-4.429 0-2.571 1.857-4.428 4.429-4.428h2.286V18.5z" fill="#fff"/>
+      <circle cx="12" cy="12" r="12" fill="#FC3F1D"/>
+      <path d="M13.32 7.666h-.924c-1.694 0-2.585.858-2.585 2.123 0 1.43.616 2.1 1.881 2.959l1.045.704-3.003 4.487H7.49l2.695-4.014c-1.55-1.111-2.42-2.19-2.42-4.015 0-2.288 1.595-3.85 4.62-3.85h3.003v11.868H13.32V7.666z" fill="#fff"/>
     </svg>
   )
 }
 
+type Step = "email" | "otp"
+
 function LoginContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const error_param = searchParams.get('error')
-  
+  const [step, setStep] = useState<Step>("email")
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
+  const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [loading, setLoading] = useState(false)
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null)
-  const [error, setError] = useState(error_param === 'server_error' ? 'Ошибка авторизации' : "")
-  const [focused, setFocused] = useState<string | null>(null)
+  const [error, setError] = useState("")
+  const [resendTimer, setResendTimer] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Check if already logged in
   useEffect(() => {
     fetch("/api/nexik/auth/session")
       .then(res => res.json())
       .then(data => {
-        if (data.session?.member) {
+        if (data.authenticated) {
           router.replace("/nexik/dashboard")
         }
       })
       .catch(() => {})
   }, [router])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (step === "email") {
+      inputRef.current?.focus()
+    }
+  }, [step])
+
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [resendTimer])
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (value.length > 1) value = value[value.length - 1]
+    if (!/^\d*$/.test(value)) return
+
+    const newOtp = [...otp]
+    newOtp[index] = value
+    setOtp(newOtp)
+
+    if (value && index < 5) {
+      otpRefs.current[index + 1]?.focus()
+    }
+
+    if (value && index === 5 && newOtp.every(d => d)) {
+      verifyOtp(newOtp.join(""))
+    }
+  }
+
+  const handleOtpPaste = (e: React.ClipboardEvent) => {
     e.preventDefault()
-    setError("")
+    const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)
+    if (paste.length === 6) {
+      setOtp(paste.split(""))
+      verifyOtp(paste)
+    }
+  }
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus()
+    }
+  }
+
+  const handleOAuth = (provider: 'google' | 'yandex') => {
+    window.location.href = `/api/nexik/auth/oauth/${provider}`
+  }
+
+  const sendOtp = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+
+    if (!email) {
+      setError("Введите email")
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError("Введите корректный email")
+      return
+    }
+
     setLoading(true)
+    setError("")
 
     try {
-      const res = await fetch("/api/nexik/auth/login", {
+      const res = await fetch("/api/nexik/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email }),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || "Ошибка входа")
+        setError(data.error || "Ошибка отправки кода")
+        setLoading(false)
+        return
+      }
+
+      setStep("otp")
+      setResendTimer(60)
+      setOtp(["", "", "", "", "", ""])
+    } catch {
+      setError("Ошибка сети")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const verifyOtp = async (code?: string) => {
+    const otpCode = code || otp.join("")
+    if (otpCode.length !== 6) return
+
+    setLoading(true)
+    setError("")
+
+    try {
+      const res = await fetch("/api/nexik/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code: otpCode }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || "Неверный код")
+        setOtp(["", "", "", "", "", ""])
+        otpRefs.current[0]?.focus()
         setLoading(false)
         return
       }
 
       router.push("/nexik/dashboard")
     } catch {
-      setError("Ошибка соединения")
+      setError("Ошибка сети")
+    } finally {
       setLoading(false)
     }
   }
 
-  const handleOAuth = (provider: 'google' | 'yandex') => {
-    setOauthLoading(provider)
-    window.location.href = `/api/nexik/auth/oauth/${provider}`
+  const resendOtp = async () => {
+    if (resendTimer > 0) return
+    await sendOtp()
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden">
-      {/* Animated background gradient */}
-      <div className="fixed inset-0 pointer-events-none">
-        <motion.div 
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px]"
-          animate={{ 
-            scale: [1, 1.1, 1],
-            rotate: [0, 180, 360],
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+      <motion.button
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        onClick={() => step === "otp" ? setStep("email") : router.back()}
+        className="absolute top-4 left-4 sm:top-8 sm:left-8 flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span className="text-sm">Назад</span>
+      </motion.button>
+
+      <div className="text-center mb-8">
+        <div className="flex justify-center mb-6">
+          <SiriOrb size={56} color="#00ffff" state="idle" />
+        </div>
+        <motion.h1
+          className="text-2xl font-semibold text-white mb-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
         >
-          <div className="absolute inset-0 bg-gradient-radial from-cyan-500/10 via-transparent to-transparent blur-3xl" />
-        </motion.div>
+          {step === "otp" ? "Введите код" : "Вход в Nexik"}
+        </motion.h1>
+        <motion.p
+          className="text-white/50 text-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, transition: { delay: 0.1 } }}
+        >
+          {step === "otp"
+            ? `Код отправлен на ${email}`
+            : "Войдите чтобы начать использовать Nexik"
+          }
+        </motion.p>
       </div>
 
-      {/* Grid pattern */}
-      <div 
-        className="fixed inset-0 pointer-events-none opacity-[0.02]"
-        style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
-                           linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-          backgroundSize: '60px 60px'
-        }}
-      />
-
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="w-full max-w-sm relative z-10"
+        className="w-full max-w-sm"
       >
-        {/* Logo */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="flex justify-center mb-10"
-        >
-          <Link href="/nexik" className="group">
-            <SiriOrb size={64} color="#00ffff" state="idle" />
-          </Link>
-        </motion.div>
-
-        {/* Title */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-2xl font-medium text-white mb-2">
-            Вход в Nexik
-          </h1>
-          <p className="text-zinc-500 text-sm">
-            Управляйте вашим AI-ассистентом
-          </p>
-        </motion.div>
-
-        {/* OAuth buttons */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.25 }}
-          className="flex gap-3 mb-6"
-        >
-          <button
-            onClick={() => handleOAuth('google')}
-            disabled={!!oauthLoading}
-            className="flex-1 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {oauthLoading === 'google' ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <GoogleIcon className="w-5 h-5" />
-            )}
-            <span className="text-sm">Google</span>
-          </button>
-          
-          <button
-            onClick={() => handleOAuth('yandex')}
-            disabled={!!oauthLoading}
-            className="flex-1 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {oauthLoading === 'yandex' ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <YandexIcon className="w-5 h-5" />
-            )}
-            <span className="text-sm">Яндекс</span>
-          </button>
-        </motion.div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex-1 h-px bg-white/10" />
-          <span className="text-xs text-zinc-600">или</span>
-          <div className="flex-1 h-px bg-white/10" />
-        </div>
-
-        {/* Form */}
-        <motion.form 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          onSubmit={handleSubmit} 
-          className="space-y-4"
-        >
-          {/* Email */}
-          <div className="relative">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onFocus={() => setFocused("email")}
-              onBlur={() => setFocused(null)}
-              className="w-full px-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:bg-white/[0.05] transition-all text-sm"
-              placeholder="Email"
-              required
-            />
-            {focused === "email" && (
-              <motion.div 
-                layoutId="focus-ring"
-                className="absolute inset-0 rounded-xl border border-cyan-500/50 pointer-events-none"
-                transition={{ duration: 0.2 }}
-              />
-            )}
-          </div>
-
-          {/* Password */}
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onFocus={() => setFocused("password")}
-              onBlur={() => setFocused(null)}
-              className="w-full px-4 py-3.5 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:bg-white/[0.05] transition-all pr-12 text-sm"
-              placeholder="Пароль"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
+        <AnimatePresence mode="wait">
+          {step === "email" && (
+            <motion.div
+              key="email"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="space-y-6"
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-            {focused === "password" && (
-              <motion.div 
-                layoutId="focus-ring"
-                className="absolute inset-0 rounded-xl border border-cyan-500/50 pointer-events-none"
-                transition={{ duration: 0.2 }}
-              />
-            )}
-          </div>
+              <form onSubmit={sendOtp}>
+                <input
+                  ref={inputRef}
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setError("")
+                  }}
+                  placeholder="email@example.com"
+                  className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-white/30 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all"
+                  autoComplete="email"
+                />
+              </form>
 
-          {/* Error */}
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm"
-            >
-              {error}
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-red-400 text-sm text-center"
+                >
+                  {error}
+                </motion.p>
+              )}
+
+              <button
+                onClick={sendOtp}
+                disabled={loading || !email}
+                className="w-full h-12 bg-white text-black font-medium rounded-lg hover:bg-white/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    Продолжить
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/10"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="px-2 bg-black text-white/40">или</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleOAuth('google')}
+                  disabled={loading}
+                  className="flex-1 h-11 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                >
+                  <GoogleIcon className="w-5 h-5" />
+                  <span className="text-white/80 text-sm">Google</span>
+                </button>
+
+                <button
+                  onClick={() => handleOAuth('yandex')}
+                  disabled={loading}
+                  className="flex-1 h-11 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                >
+                  <YandexIcon className="w-5 h-5" />
+                  <span className="text-white/80 text-sm">Яндекс</span>
+                </button>
+              </div>
+
+              <p className="text-white/50 text-sm text-center">
+                Нет аккаунта?{" "}
+                <Link href="/nexik/register" className="text-white hover:underline">
+                  Создать
+                </Link>
+              </p>
             </motion.div>
           )}
 
-          {/* Submit */}
-          <motion.button
-            type="submit"
-            disabled={loading}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            className="w-full py-3.5 bg-white text-black font-medium rounded-xl hover:bg-zinc-100 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin" size={18} />
-                <span>Вход...</span>
-              </>
-            ) : (
-              <>
-                <span>Продолжить</span>
-                <ArrowRight size={18} />
-              </>
-            )}
-          </motion.button>
-        </motion.form>
-
-        {/* Links */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-8 space-y-4 text-center"
-        >
-          <Link
-            href="/nexik/forgot-password"
-            className="text-sm text-zinc-500 hover:text-white transition-colors block"
-          >
-            Забыли пароль?
-          </Link>
-          
-          <div className="text-sm text-zinc-600">
-            Нет аккаунта?{" "}
-            <Link
-              href="/nexik/register"
-              className="text-white hover:text-cyan-400 transition-colors"
+          {step === "otp" && (
+            <motion.div
+              key="otp"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
             >
-              Создать
-            </Link>
-          </div>
-        </motion.div>
+              <div className="flex justify-center gap-2 sm:gap-3">
+                {otp.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(el) => { otpRefs.current[index] = el }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(index, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
+                    onPaste={index === 0 ? handleOtpPaste : undefined}
+                    className="w-11 h-14 sm:w-12 sm:h-14 text-center text-xl font-medium bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all"
+                    autoFocus={index === 0}
+                  />
+                ))}
+              </div>
 
-        {/* Demo button */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-8"
-        >
-          <Link
-            href="/nexik"
-            className="w-full py-3.5 border border-white/10 rounded-xl text-zinc-400 hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2 text-sm"
-          >
-            Попробовать без регистрации
-          </Link>
-        </motion.div>
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-red-400 text-sm text-center"
+                >
+                  {error}
+                </motion.p>
+              )}
+
+              {loading && (
+                <div className="flex justify-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+                </div>
+              )}
+
+              <div className="text-center">
+                {resendTimer > 0 ? (
+                  <p className="text-white/40 text-sm">
+                    Отправить повторно через {resendTimer} сек
+                  </p>
+                ) : (
+                  <button
+                    onClick={resendOtp}
+                    disabled={loading}
+                    className="text-white/60 text-sm hover:text-white transition-colors"
+                  >
+                    Отправить код повторно
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={() => setStep("email")}
+                className="text-white/40 text-sm text-center w-full hover:text-white/60 transition-colors"
+              >
+                ← Изменить email
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   )
 }
 
-function LoadingFallback() {
+function LoginLoading() {
   return (
     <div className="min-h-screen bg-black flex items-center justify-center">
       <Loader2 className="w-8 h-8 animate-spin text-white/50" />
@@ -330,7 +391,7 @@ function LoadingFallback() {
 
 export default function NexikLoginPage() {
   return (
-    <Suspense fallback={<LoadingFallback />}>
+    <Suspense fallback={<LoginLoading />}>
       <LoginContent />
     </Suspense>
   )
