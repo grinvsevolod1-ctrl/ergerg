@@ -43,6 +43,88 @@ export async function initNexikSchema(): Promise<void> {
       deleted_at TIMESTAMP
     );
 
+    -- Business Profiles (detailed info about client's business for personal Nexik)
+    CREATE TABLE IF NOT EXISTS nexik_business_profiles (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      
+      -- Basic info
+      business_name VARCHAR(255),
+      business_type VARCHAR(100),
+      industry VARCHAR(100),
+      
+      -- Description
+      short_description TEXT,
+      full_description TEXT,
+      
+      -- Services/Products
+      services TEXT[] DEFAULT '{}',
+      products TEXT[] DEFAULT '{}',
+      
+      -- Target audience
+      target_audience TEXT,
+      customer_personas JSONB DEFAULT '[]',
+      
+      -- Pain points and goals
+      pain_points TEXT[] DEFAULT '{}',
+      goals TEXT[] DEFAULT '{}',
+      challenges TEXT[] DEFAULT '{}',
+      
+      -- Communication style
+      brand_voice VARCHAR(50) DEFAULT 'professional',
+      tone_preferences JSONB DEFAULT '{}',
+      
+      -- Contact info for Nexik to use
+      contact_email VARCHAR(255),
+      contact_phone VARCHAR(50),
+      website_url TEXT,
+      social_links JSONB DEFAULT '{}',
+      
+      -- Working hours
+      working_hours JSONB DEFAULT '{}',
+      timezone VARCHAR(50) DEFAULT 'UTC',
+      
+      -- Competitors and market
+      competitors TEXT[] DEFAULT '{}',
+      unique_selling_points TEXT[] DEFAULT '{}',
+      
+      -- FAQ for Nexik
+      faq JSONB DEFAULT '[]',
+      
+      -- Onboarding progress
+      onboarding_completed BOOLEAN DEFAULT false,
+      onboarding_step INTEGER DEFAULT 0,
+      
+      -- AI Memory
+      ai_learned_facts JSONB DEFAULT '[]',
+      ai_conversation_summary TEXT,
+      
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      
+      UNIQUE(org_id)
+    );
+
+    -- Personal Nexik Chat Messages (for personal dashboard)
+    CREATE TABLE IF NOT EXISTS nexik_personal_messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      member_id UUID REFERENCES nexik_org_members(id) ON DELETE SET NULL,
+      conversation_id VARCHAR(255) NOT NULL,
+      role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+      content TEXT NOT NULL,
+      
+      -- Metadata
+      metadata JSONB DEFAULT '{}',
+      
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Indexes for personal messages
+    CREATE INDEX IF NOT EXISTS idx_nexik_personal_messages_org ON nexik_personal_messages(org_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_personal_messages_member ON nexik_personal_messages(member_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_personal_messages_created ON nexik_personal_messages(created_at);
+
     -- Organization Members (Users who manage the org)
     CREATE TABLE IF NOT EXISTS nexik_org_members (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
