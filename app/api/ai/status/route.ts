@@ -1,34 +1,38 @@
 /**
  * Nexik AI Status API
- * Проверка статуса Ollama сервера
+ * Проверка статуса AI серверов
  */
 
 import { NextResponse } from 'next/server'
-import { checkHealth, getAIInfo } from '@/lib/ai/router'
+import { checkHealth, getAIInfo, getAllServersHealth, AI_SERVERS } from '@/lib/ai/router'
 import { OLLAMA_MODELS } from '@/lib/ai/config'
 
 export async function GET() {
-  const info = getAIInfo()
-  const health = await checkHealth()
+  const info = await getAIInfo()
+  const healthy = await checkHealth()
+  const serversHealth = await getAllServersHealth()
 
   return NextResponse.json({
-    status: health.healthy ? 'ok' : 'error',
+    status: healthy ? 'ok' : 'error',
     engine: 'ollama',
     config: {
-      baseUrl: info.baseUrl,
+      endpoint: info.endpoint,
       model: info.model,
-      fallbackModel: info.fallbackModel,
-      maxTokens: info.maxTokens,
-      temperature: info.temperature,
+      server: info.server,
+      available: info.available,
     },
-    health: {
-      serverOnline: health.healthy,
-      modelAvailable: health.modelAvailable,
-      availableModels: health.availableModels,
-    },
-    supportedModels: Object.entries(OLLAMA_MODELS).map(([id, info]) => ({
+    servers: serversHealth,
+    serverConfigs: Object.entries(AI_SERVERS).map(([key, config]) => ({
+      key,
+      name: config.name,
+      url: config.url,
+      model: config.defaultModel,
+      timeout: config.timeout,
+      weight: config.weight,
+    })),
+    supportedModels: Object.entries(OLLAMA_MODELS).map(([id, modelInfo]) => ({
       id,
-      ...info,
+      ...modelInfo,
     })),
     timestamp: new Date().toISOString(),
   })
