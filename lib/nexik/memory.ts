@@ -52,7 +52,7 @@ export async function getOrCreateVisitor(visitorId: string): Promise<VisitorMemo
       [visitorId]
     )
     
-    if (result.length > 0) {
+    if (result && result.length > 0) {
       const row = result[0]
       // Обновляем last_seen
       await execute(
@@ -229,6 +229,8 @@ export async function getRecentMessages(
       [visitorId, limit]
     )
     
+    if (!result || result.length === 0) return []
+    
     return result.reverse().map(row => ({
       role: row.role,
       content: row.content,
@@ -254,6 +256,8 @@ export async function getActivePromises(visitorId: string): Promise<string[]> {
        LIMIT 10`,
       [visitorId]
     )
+    
+    if (!result || result.length === 0) return []
     
     const allPromises: string[] = []
     for (const row of result) {
