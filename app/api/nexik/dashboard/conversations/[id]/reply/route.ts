@@ -4,14 +4,14 @@ import { query, execute } from '@/lib/db'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ conversationId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession()
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   
-  const { conversationId } = await params
+  const { id: conversationId } = await params
   const orgId = session.member?.org_id || session.org?.id
   const memberId = session.member?.id
   const memberName = session.member?.name || 'Оператор'
