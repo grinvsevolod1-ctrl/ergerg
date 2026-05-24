@@ -91,8 +91,6 @@ export function NexikDemoChat({ isOpen, onOpenChange, onStartOnboarding }: Nexik
       const history = getConversationHistory(10)
       const businessCtx = getBusinessContext()
       
-      console.log('[v0] NexikDemoChat calling API with:', userContent)
-      
       // Call AI
       const response = await fetch('/api/nexik/analyze-input', {
         method: 'POST',
@@ -109,8 +107,6 @@ export function NexikDemoChat({ isOpen, onOpenChange, onStartOnboarding }: Nexik
       if (!response.ok) throw new Error('API error')
       
       const data = await response.json()
-      
-      console.log('[v0] NexikDemoChat API response:', data)
       
       setIsThinking(false)
       

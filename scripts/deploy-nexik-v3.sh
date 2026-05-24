@@ -2,6 +2,9 @@
 
 # NEXIK v3.0 Deploy Script
 # Запускай: ./scripts/deploy-nexik-v3.sh
+#
+# REQUIRED: Create /var/www/netnext-new/.env with DATABASE_URL before running
+# Example: DATABASE_URL=postgresql://netnext:YOUR_PASSWORD@localhost:5432/netnext
 
 set -e
 
@@ -9,12 +12,22 @@ echo "=== Deploying NEXIK v3.0 ==="
 
 cd /var/www/netnext-new
 
-# Загружаем переменные окружения
-source .env 2>/dev/null || true
+# Load environment variables from .env file
+if [ -f .env ]; then
+    set -a
+    source .env
+    set +a
+else
+    echo "ERROR: .env file not found!"
+    echo "Create .env with DATABASE_URL before running this script."
+    exit 1
+fi
 
-# Формируем DATABASE_URL, если не задан
+# Validate DATABASE_URL is set
 if [ -z "$DATABASE_URL" ]; then
-    DATABASE_URL="postgresql://netnext:${DB_PASSWORD:-P1fcAI+RagRQWmE1Oq6Xlg==}@localhost:5432/netnext"
+    echo "ERROR: DATABASE_URL is not set in .env file!"
+    echo "Add DATABASE_URL=postgresql://user:password@host:port/database to .env"
+    exit 1
 fi
 
 export DATABASE_URL
@@ -30,16 +43,11 @@ pnpm install || pnpm install --no-frozen-lockfile
 # 3. Run database migrations
 echo "[3/5] Running database migrations..."
 
-# Проверяем подключение
+# Verify database connection
 if ! psql "$DATABASE_URL" -c "SELECT 1" > /dev/null 2>&1; then
-    echo "ERROR: Cannot connect to database with DATABASE_URL"
-    echo "Trying with explicit credentials..."
-    DATABASE_URL="postgresql://netnext:P1fcAI+RagRQWmE1Oq6Xlg==@localhost:5432/netnext"
-    if ! psql "$DATABASE_URL" -c "SELECT 1" > /dev/null 2>&1; then
-        echo "FATAL: Database connection failed. Run migrations manually."
-        echo "psql -U netnext -d netnext -f scripts/migrations/001_nexik_v3.sql"
-        exit 1
-    fi
+    echo "ERROR: Cannot connect to database!"
+    echo "Check DATABASE_URL in .env file and ensure PostgreSQL is running."
+    exit 1
 fi
 
 psql "$DATABASE_URL" << 'SQL'

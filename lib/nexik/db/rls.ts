@@ -4,6 +4,9 @@
  * 
  * RLS ensures that even if application code has bugs,
  * users can only access data belonging to their organization.
+ * 
+ * SECURITY: All policies REQUIRE app.current_org_id to be set.
+ * If not set, NO data is accessible (fail-closed).
  */
 
 import { execute, query } from '@/lib/db'
@@ -23,7 +26,10 @@ export async function initNexikRLS(): Promise<void> {
       -- session variables set by the application before queries.
       -- This allows RLS to work without requiring PostgreSQL roles per user.
       --
-      -- Before each request, application should call:
+      -- SECURITY: Policies are FAIL-CLOSED - if org_id is not set,
+      -- NO data is accessible. This prevents accidental data leaks.
+      --
+      -- Before each request, application MUST call:
       --   SELECT set_config('app.current_org_id', 'org-uuid-here', true);
       --   SELECT set_config('app.current_member_id', 'member-uuid-here', true);
       -- The 'true' parameter makes it local to the transaction.
@@ -67,16 +73,17 @@ export async function initNexikRLS(): Promise<void> {
       DROP POLICY IF EXISTS nexik_analytics_isolation ON nexik_analytics;
 
       -- =====================================================
-      -- CREATE RLS POLICIES
+      -- CREATE RLS POLICIES (FAIL-CLOSED: require org_id)
       -- =====================================================
 
       -- Organizations: Users can only see their own organization
+      -- SECURITY: Fails closed - if org_id not set, returns no rows
       CREATE POLICY nexik_org_isolation ON nexik_organizations
         FOR ALL
         USING (
           id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Members: Users can only see members of their organization
@@ -84,8 +91,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- API Keys: Org-level isolation
@@ -93,8 +100,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Widgets: Org-level isolation
@@ -102,8 +109,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Knowledge Docs: Org-level isolation
@@ -111,8 +118,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Knowledge Chunks: Org-level isolation
@@ -120,8 +127,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Conversations: Org-level isolation
@@ -129,8 +136,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Messages: Org-level isolation
@@ -138,8 +145,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Operator Presence: Org-level isolation
@@ -147,8 +154,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Webhooks: Org-level isolation
@@ -156,20 +163,20 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Webhook Deliveries: Through webhook's org_id
       CREATE POLICY nexik_webhook_deliveries_isolation ON nexik_webhook_deliveries
         FOR ALL
         USING (
-          webhook_id IN (
+          current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
+          AND webhook_id IN (
             SELECT id FROM nexik_webhooks 
             WHERE org_id::text = current_setting('app.current_org_id', true)
           )
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
         );
 
       -- Schedules: Org-level isolation
@@ -177,8 +184,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Canned Responses: Org-level isolation
@@ -186,8 +193,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
 
       -- Analytics: Org-level isolation
@@ -195,8 +202,8 @@ export async function initNexikRLS(): Promise<void> {
         FOR ALL
         USING (
           org_id::text = current_setting('app.current_org_id', true)
-          OR current_setting('app.current_org_id', true) IS NULL
-          OR current_setting('app.current_org_id', true) = ''
+          AND current_setting('app.current_org_id', true) IS NOT NULL
+          AND current_setting('app.current_org_id', true) != ''
         );
     `)
 

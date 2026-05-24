@@ -1,3 +1,15 @@
+/**
+ * PM2 Ecosystem Configuration
+ * 
+ * IMPORTANT: All secrets are loaded from environment variables.
+ * Set them in /var/www/netnext-new/.env or via system environment.
+ * 
+ * Required environment variables:
+ * - DATABASE_URL: PostgreSQL connection string
+ * - REDIS_URL: Redis connection string (default: redis://localhost:6379)
+ * - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
+ * - DKIM_SELECTOR, DKIM_DOMAIN, DKIM_PRIVATE_KEY_PATH (optional)
+ */
 module.exports = {
   apps: [
     {
@@ -5,18 +17,12 @@ module.exports = {
       script: 'pnpm',
       args: 'start',
       cwd: '/var/www/netnext-new',
+      // Load from .env file - no hardcoded secrets
+      env_file: '.env',
       env: {
         NODE_ENV: 'production',
-        REDIS_URL: 'redis://localhost:6379',
-        DATABASE_URL: 'postgresql://netnext:P1fcAI+RagRQWmE1Oq6Xlg==@localhost:5432/netnext',
-        SMTP_HOST: 'smtp.mail.ru',
-        SMTP_PORT: '465',
-        SMTP_USER: 'hello@netnext.site',
-        SMTP_PASS: '8nJPG68mDgr73Kk1Ui1L',
-        SMTP_FROM: 'hello@netnext.site',
-        DKIM_SELECTOR: 'vps',
-        DKIM_DOMAIN: 'netnext.site',
-        DKIM_PRIVATE_KEY_PATH: '/etc/opendkim/keys/vps.private'
+        // Defaults only for non-sensitive values
+        REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
       }
     },
     {
@@ -24,25 +30,18 @@ module.exports = {
       script: 'pnpm',
       args: 'run worker',
       cwd: '/var/www/netnext-new',
+      env_file: '.env',
       env: {
         NODE_ENV: 'production',
-        REDIS_URL: 'redis://localhost:6379',
-        DATABASE_URL: 'postgresql://netnext:P1fcAI+RagRQWmE1Oq6Xlg==@localhost:5432/netnext',
-        SMTP_HOST: 'smtp.mail.ru',
-        SMTP_PORT: '465',
-        SMTP_USER: 'hello@netnext.site',
-        SMTP_PASS: '8nJPG68mDgr73Kk1Ui1L',
-        SMTP_FROM: 'hello@netnext.site',
-        DKIM_SELECTOR: 'vps',
-        DKIM_DOMAIN: 'netnext.site',
-        DKIM_PRIVATE_KEY_PATH: '/etc/opendkim/keys/vps.private'
+        REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
       }
     },
     {
       name: 'netnext-bot',
       script: 'venv/bin/python',
       args: 'bot.py',
-      cwd: '/var/www/netnext-new/telegram-bot'
+      cwd: '/var/www/netnext-new/telegram-bot',
+      env_file: '.env',
     }
   ]
 }

@@ -1,6 +1,10 @@
 /**
  * NEXIK Memory System v3.0
  * Долгосрочная память с классификацией и эмоциональным контекстом
+ * 
+ * NOTE: This module works with the unified schema in lib/nexik/db/schema.ts
+ * For multi-tenant (SaaS) use, see schema.ts nexik_messages table.
+ * This module is for the demo/homepage chat without organization context.
  */
 
 import { query, execute } from '@/lib/db'
@@ -46,14 +50,11 @@ export interface MemoryMessage {
  */
 export async function getOrCreateVisitor(visitorId: string): Promise<VisitorMemory> {
   try {
-    console.log('[v0] getOrCreateVisitor called with:', visitorId)
     // Попробуем найти существующего
     const result = await query<VisitorMemory>(
       `SELECT * FROM nexik_visitors WHERE visitor_id = $1`,
       [visitorId]
     )
-    
-    console.log('[v0] query result type:', typeof result, 'isArray:', Array.isArray(result), 'value:', result)
     
     if (result && Array.isArray(result) && result.length > 0) {
       const row = result[0]
@@ -174,7 +175,8 @@ export async function updateVisitor(
 }
 
 /**
- * Сохранить сообщение в историю
+ * Сохранить сообщение в историю (demo/homepage chat)
+ * For multi-tenant SaaS, use the conversation service in lib/nexik/db/conversations.ts
  */
 export async function saveMessage(
   visitorId: string,
@@ -190,7 +192,7 @@ export async function saveMessage(
 ): Promise<void> {
   try {
     await execute(
-      `INSERT INTO nexik_messages 
+      `INSERT INTO nexik_demo_messages 
        (visitor_id, conversation_id, role, content, sentiment, intent, extracted_facts, promises, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
       [
@@ -217,7 +219,6 @@ export async function getRecentMessages(
   limit: number = 20
 ): Promise<MemoryMessage[]> {
   try {
-    console.log('[v0] getRecentMessages called with:', visitorId)
     const result = await query<{
       role: 'user' | 'assistant'
       content: string
@@ -226,14 +227,12 @@ export async function getRecentMessages(
       intent: string
     }>(
       `SELECT role, content, created_at, sentiment, intent 
-       FROM nexik_messages 
+       FROM nexik_demo_messages 
        WHERE visitor_id = $1 
        ORDER BY created_at DESC 
        LIMIT $2`,
       [visitorId, limit]
     )
-    
-    console.log('[v0] getRecentMessages result:', typeof result, Array.isArray(result), result?.length)
     
     if (!result || !Array.isArray(result) || result.length === 0) return []
     
@@ -255,16 +254,13 @@ export async function getRecentMessages(
  */
 export async function getActivePromises(visitorId: string): Promise<string[]> {
   try {
-    console.log('[v0] getActivePromises called with:', visitorId)
     const result = await query<{ promises: string[] }>(
-      `SELECT promises FROM nexik_messages 
+      `SELECT promises FROM nexik_demo_messages 
        WHERE visitor_id = $1 AND role = 'assistant' AND promises != '{}'
        ORDER BY created_at DESC
        LIMIT 10`,
       [visitorId]
     )
-    
-    console.log('[v0] getActivePromises result:', typeof result, Array.isArray(result), result?.length)
     
     if (!result || !Array.isArray(result) || result.length === 0) return []
     
@@ -450,10 +446,13 @@ export async function generateVisitorContext(visitorId: string): Promise<string>
 }
 
 /**
- * SQL для создания табли�� (выполнить один раз)
+ * SQL для создания таблиц демо-чата (выполнить один раз)
+ * 
+ * NOTE: This is for the demo/homepage chat only.
+ * Multi-tenant SaaS tables are in lib/nexik/db/schema.ts
  */
 export const MEMORY_TABLES_SQL = `
--- Таблица посетителей
+-- Таблица посетителей демо-чата
 CREATE TABLE IF NOT EXISTS nexik_visitors (
   id SERIAL PRIMARY KEY,
   visitor_id VARCHAR(255) UNIQUE NOT NULL,
@@ -472,12 +471,12 @@ CREATE TABLE IF NOT EXISTS nexik_visitors (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Таблица сообщений
-CREATE TABLE IF NOT EXISTS nexik_messages (
+-- Таблица сообщений демо-чата (отдельная от multi-tenant nexik_messages)
+CREATE TABLE IF NOT EXISTS nexik_demo_messages (
   id SERIAL PRIMARY KEY,
-  visitor_id VARCHAR(255) NOT NULL,
+  visitor_id VARCHAR(255) NOT NULL REFERENCES nexik_visitors(visitor_id) ON DELETE CASCADE,
   conversation_id VARCHAR(255) NOT NULL,
-  role VARCHAR(20) NOT NULL,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
   content TEXT NOT NULL,
   sentiment VARCHAR(20) DEFAULT 'neutral',
   intent VARCHAR(100),
@@ -488,7 +487,7 @@ CREATE TABLE IF NOT EXISTS nexik_messages (
 
 -- Индексы
 CREATE INDEX IF NOT EXISTS idx_nexik_visitors_visitor_id ON nexik_visitors(visitor_id);
-CREATE INDEX IF NOT EXISTS idx_nexik_messages_visitor_id ON nexik_messages(visitor_id);
-CREATE INDEX IF NOT EXISTS idx_nexik_messages_conversation_id ON nexik_messages(conversation_id);
-CREATE INDEX IF NOT EXISTS idx_nexik_messages_created_at ON nexik_messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_nexik_demo_messages_visitor_id ON nexik_demo_messages(visitor_id);
+CREATE INDEX IF NOT EXISTS idx_nexik_demo_messages_conversation_id ON nexik_demo_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_nexik_demo_messages_created_at ON nexik_demo_messages(created_at);
 `
