@@ -152,7 +152,108 @@ function DotGrid() {
   )
 }
 
-function ChatDemo({ visible }: { visible: boolean }) {
+// Animated arrow pointing to chat
+function AnimatedArrow({ direction, delay = 0 }: { direction: 'left' | 'right', delay?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: delay + 0.5, duration: 0.5 }}
+      className={`hidden lg:block absolute top-1/2 -translate-y-1/2 ${
+        direction === 'left' ? '-right-8' : '-left-8'
+      }`}
+    >
+      <motion.svg
+        width="32"
+        height="24"
+        viewBox="0 0 32 24"
+        fill="none"
+        className={direction === 'right' ? 'rotate-180' : ''}
+      >
+        <motion.path
+          d="M0 12 C8 12, 16 12, 24 12 M24 12 L16 4 M24 12 L16 20"
+          stroke="url(#arrowGradient)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ delay: delay + 0.8, duration: 0.6, ease: "easeOut" }}
+        />
+        <defs>
+          <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(34,211,238,0.2)" />
+            <stop offset="100%" stopColor="rgba(34,211,238,0.6)" />
+          </linearGradient>
+        </defs>
+      </motion.svg>
+      <motion.div
+        className="absolute top-1/2 -translate-y-1/2"
+        style={{ [direction === 'left' ? 'right' : 'left']: '-4px' }}
+        animate={{ 
+          x: direction === 'left' ? [0, 4, 0] : [0, -4, 0],
+          opacity: [0.4, 1, 0.4]
+        }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <div className="w-2 h-2 rounded-full bg-cyan-400/60" />
+      </motion.div>
+    </motion.div>
+  )
+}
+
+// Quick action button with hover effect
+function QuickActionButton({ 
+  action, 
+  onClick, 
+  delay = 0,
+  side
+}: { 
+  action: string
+  onClick: () => void
+  delay?: number
+  side?: 'left' | 'right'
+}) {
+  return (
+    <motion.button
+      initial={{ opacity: 0, x: side === 'left' ? -20 : side === 'right' ? 20 : 0, y: side ? 0 : 10 }}
+      animate={{ opacity: 1, x: 0, y: 0 }}
+      transition={{ delay, duration: 0.4, ease: "easeOut" }}
+      onClick={onClick}
+      className="group relative px-4 py-2.5 rounded-xl text-sm font-medium text-zinc-400 transition-all duration-300 whitespace-nowrap"
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        border: "1px solid rgba(255,255,255,0.08)",
+      }}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+    >
+      <span className="relative z-10 group-hover:text-cyan-300 transition-colors">{action}</span>
+      <motion.div
+        className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        style={{
+          background: "linear-gradient(135deg, rgba(34,211,238,0.1) 0%, rgba(34,211,238,0.05) 100%)",
+          border: "1px solid rgba(34,211,238,0.2)",
+        }}
+      />
+      <motion.div
+        className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100"
+        style={{
+          boxShadow: "0 0 20px rgba(34,211,238,0.15)",
+        }}
+        transition={{ duration: 0.3 }}
+      />
+    </motion.button>
+  )
+}
+
+interface ChatDemoProps {
+  visible: boolean
+  showQuickActions?: boolean
+  quickActionTrigger?: string | null
+}
+
+function ChatDemo({ visible, showQuickActions = false, quickActionTrigger }: ChatDemoProps) {
   const [messages, setMessages] = useState<Message[]>([
     { id: "1", role: "assistant", content: WELCOME_MESSAGE }
   ])
@@ -161,6 +262,43 @@ function ChatDemo({ visible }: { visible: boolean }) {
   const [isListening, setIsListening] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isFirstRender = useRef(true)
+  const lastTrigger = useRef<string | null>(null)
+  
+  // Quick action handler (used by both internal buttons and external trigger)
+  const handleQuickAction = useCallback(async (action: string) => {
+    if (isTyping) return
+    
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: `У меня ${action.toLowerCase()}` }
+    setMessages(prev => [...prev, userMsg])
+    setIsTyping(true)
+
+    try {
+      const response = await fetch('/api/nexik/analyze-input', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          input: userMsg.content,
+          conversationHistory: messages.map(m => ({ role: m.role, content: m.content }))
+        })
+      })
+      
+      const data = await response.json()
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: data.response }])
+    } catch {
+      const response = getResponse(userMsg.content)
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: response }])
+    }
+    
+    setIsTyping(false)
+  }, [isTyping, messages])
+  
+  // Handle external quick action trigger from parent
+  useEffect(() => {
+    if (quickActionTrigger && quickActionTrigger !== lastTrigger.current && messages.length === 1 && !isTyping) {
+      lastTrigger.current = quickActionTrigger
+      handleQuickAction(quickActionTrigger)
+    }
+  }, [quickActionTrigger, messages.length, isTyping, handleQuickAction])
 
   const toggleVoice = useCallback(() => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -233,32 +371,6 @@ function ChatDemo({ visible }: { visible: boolean }) {
   }, [input, isTyping, messages])
 
   const quickActions = ["Автосервис", "Салон красоты", "Ресторан", "Клиника", "Магазин", "Фитнес"]
-
-  const sendQuickAction = useCallback(async (action: string) => {
-    if (isTyping) return
-    const userMsg: Message = { id: Date.now().toString(), role: "user", content: `У меня ${action.toLowerCase()}` }
-    setMessages(prev => [...prev, userMsg])
-    setIsTyping(true)
-
-    try {
-      const response = await fetch('/api/nexik/analyze-input', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          input: userMsg.content,
-          conversationHistory: messages.map(m => ({ role: m.role, content: m.content }))
-        })
-      })
-      
-      const data = await response.json()
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: data.response }])
-    } catch {
-      const response = getResponse(userMsg.content)
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: "assistant", content: response }])
-    }
-    
-    setIsTyping(false)
-  }, [isTyping, messages])
 
   if (!visible) return null
 
@@ -350,12 +462,12 @@ function ChatDemo({ visible }: { visible: boolean }) {
             </motion.div>
           )}
 
-          {messages.length === 1 && !isTyping && (
-            <div className="flex flex-wrap gap-2 pt-2">
+          {messages.length === 1 && !isTyping && showQuickActions && (
+            <div className="flex flex-wrap gap-2 pt-2 lg:hidden">
               {quickActions.map((action) => (
                 <button
                   key={action}
-                  onClick={() => sendQuickAction(action)}
+                  onClick={() => handleQuickAction(action)}
                   className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm text-zinc-400 hover:bg-cyan-500/10 hover:border-cyan-500/30 hover:text-cyan-300 transition-colors"
                 >
                   {action}
@@ -474,6 +586,7 @@ export default function NexikPage() {
   const [phase, setPhase] = useState<"loading" | "title" | "chat">("loading")
   const [headerTitle, setHeaderTitle] = useState(false)
   const [showToast, setShowToast] = useState(false)
+  const [quickActionTrigger, setQuickActionTrigger] = useState<string | null>(null)
 
   const handleOrbClick = () => {
     setShowToast(true)
@@ -657,7 +770,70 @@ export default function NexikPage() {
               transition={{ duration: 0.5 }}
               className="w-full mt-6 sm:mt-10"
             >
-              <ChatDemo visible={true} />
+              {/* Desktop: Quick actions on sides with arrows */}
+              <div className="flex items-start justify-center gap-6 xl:gap-12">
+                {/* Left side quick actions */}
+                <div className="hidden lg:flex flex-col gap-3 pt-20 relative">
+                  {["Автосервис", "Салон красоты", "Ресторан"].map((action, i) => (
+                    <div key={action} className="relative">
+                      <QuickActionButton
+                        action={action}
+                        onClick={() => setQuickActionTrigger(action)}
+                        delay={0.3 + i * 0.1}
+                        side="left"
+                      />
+                      {i === 1 && <AnimatedArrow direction="left" delay={0.5} />}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Chat */}
+                <div className="w-full max-w-lg">
+                  <ChatDemo 
+                    visible={true} 
+                    quickActionTrigger={quickActionTrigger}
+                    showQuickActions={true}
+                  />
+                </div>
+
+                {/* Right side quick actions */}
+                <div className="hidden lg:flex flex-col gap-3 pt-20 relative">
+                  {["Клиника", "Магазин", "Фитнес"].map((action, i) => (
+                    <div key={action} className="relative">
+                      <QuickActionButton
+                        action={action}
+                        onClick={() => setQuickActionTrigger(action)}
+                        delay={0.4 + i * 0.1}
+                        side="right"
+                      />
+                      {i === 1 && <AnimatedArrow direction="right" delay={0.6} />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mobile: Horizontal scroll quick actions */}
+              <div className="lg:hidden mt-6 -mx-4 px-4">
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.4 }}
+                  className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {["Автосервис", "Салон красоты", "Ресторан", "Клиника", "Магазин", "Фитнес"].map((action, i) => (
+                    <QuickActionButton
+                      key={action}
+                      action={action}
+                      onClick={() => setQuickActionTrigger(action)}
+                      delay={0.6 + i * 0.05}
+                    />
+                  ))}
+                </motion.div>
+                <p className="text-center text-xs text-zinc-600 mt-3">
+                  Выберите тип бизнеса или опишите свой
+                </p>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
