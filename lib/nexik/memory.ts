@@ -52,8 +52,8 @@ export async function getOrCreateVisitor(visitorId: string): Promise<VisitorMemo
       [visitorId]
     )
     
-    if (result.rows.length > 0) {
-      const row = result.rows[0]
+    if (result.length > 0) {
+      const row = result[0]
       // Обновляем last_seen
       await execute(
         `UPDATE nexik_visitors SET last_seen = NOW(), total_interactions = total_interactions + 1 WHERE visitor_id = $1`,
@@ -229,7 +229,7 @@ export async function getRecentMessages(
       [visitorId, limit]
     )
     
-    return result.rows.reverse().map(row => ({
+    return result.reverse().map(row => ({
       role: row.role,
       content: row.content,
       timestamp: row.created_at,
@@ -256,7 +256,7 @@ export async function getActivePromises(visitorId: string): Promise<string[]> {
     )
     
     const allPromises: string[] = []
-    for (const row of result.rows) {
+    for (const row of result) {
       if (row.promises) {
         allPromises.push(...row.promises)
       }
@@ -437,7 +437,7 @@ export async function generateVisitorContext(visitorId: string): Promise<string>
 }
 
 /**
- * SQL для создания таблиц (выполнить один раз)
+ * SQL для создания табли�� (выполнить один раз)
  */
 export const MEMORY_TABLES_SQL = `
 -- Таблица посетителей
