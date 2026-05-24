@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/nexik/services/auth'
-import { query } from '@/lib/db'
+import { query, execute } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   const session = await getSession()
@@ -23,17 +23,59 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.success && data.session_string) {
-      await query(
-        `INSERT INTO nexik_integrations (org_id, platform, platform_id, access_token, is_active)
-         VALUES ($1, $2, $3, $4, true)
-         ON CONFLICT (org_id, platform) DO UPDATE 
-         SET access_token = EXCLUDED.access_token, is_active = true, updated_at = NOW()`,
-        [session.member.org_id, 'telegram', phone, data.session_string]
+      const orgId = session.member.org_id
+      
+      // Check if integration already exists
+      const existing = await query<{ id: string }>(
+        `SELECT id FROM nexik_integrations 
+         WHERE org_id = $1 AND platform = 'telegram' AND platform_id = $2`,
+        [orgId, phone]
       )
+      
+      let integrationId: string
+      
+      if (existing[0]) {
+        // Update existing integration
+        integrationId = existing[0].id
+        await execute(
+          `UPDATE nexik_integrations 
+           SET access_token = $1, is_active = true, is_connected = true, 
+               last_connected_at = NOW(), connection_error = NULL, updated_at = NOW()
+           WHERE id = $2`,
+          [data.session_string, integrationId]
+        )
+      } else {
+        // Create new integration
+        const result = await query<{ id: string }>(
+          `INSERT INTO nexik_integrations (
+            org_id, platform, platform_id, platform_name, access_token, 
+            is_active, is_connected, last_connected_at
+          ) VALUES ($1, 'telegram', $2, $3, $4, true, true, NOW())
+          RETURNING id`,
+          [orgId, phone, data.user_name || phone, data.session_string]
+        )
+        integrationId = result[0].id
+        
+        // Create default telegram settings
+        await execute(
+          `INSERT INTO nexik_telegram_settings (org_id, integration_id)
+           VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [orgId, integrationId]
+        )
+      }
+      
+      return NextResponse.json({ 
+        success: true, 
+        integration_id: integrationId,
+        phone,
+        user_name: data.user_name
+      })
     }
 
     return NextResponse.json(data, { status: response.status })
   } catch (error) {
+    console.error('[Telegram Verify] Error:', error)
     return NextResponse.json({ error: 'Telegram service unavailable' }, { status: 503 })
   }
 }

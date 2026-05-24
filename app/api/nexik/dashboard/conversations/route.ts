@@ -37,6 +37,9 @@ export async function GET(req: NextRequest) {
     
     const widgetId = searchParams.get('widget_id')
     if (widgetId) filters.widget_id = widgetId
+    
+    const source = searchParams.get('source')
+    if (source) filters.source = source as 'all' | 'widget' | 'telegram'
 
     // Get conversations and stats in parallel
     const [conversationsResult, stats] = await Promise.all([
@@ -68,6 +71,7 @@ export async function GET(req: NextRequest) {
         createdAt: conv.created_at,
         lastMessageAt: conv.last_message_at,
         resolvedAt: conv.resolved_at,
+        source: conv.visitor_id?.startsWith('tg_') ? 'telegram' : 'widget',
       })),
       pagination: {
         page,

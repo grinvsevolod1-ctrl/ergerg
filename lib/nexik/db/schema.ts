@@ -5,7 +5,7 @@
 
 import { query, execute } from '@/lib/db'
 
-export const NEXIK_SCHEMA_VERSION = 1
+export const NEXIK_SCHEMA_VERSION = 4
 
 export async function initNexikSchema(): Promise<void> {
   await execute(`
@@ -785,6 +785,202 @@ export async function initNexikSchema(): Promise<void> {
     );
 
     CREATE INDEX IF NOT EXISTS idx_nexik_personalities_org ON nexik_personalities(org_id);
+
+    -- =====================================================
+    -- INTEGRATIONS SYSTEM (v4) - Telegram, Instagram, etc.
+    -- =====================================================
+
+    -- Main integrations table (Telegram, Instagram, etc.)
+    CREATE TABLE IF NOT EXISTS nexik_integrations (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      
+      -- Platform info
+      platform VARCHAR(50) NOT NULL,  -- 'telegram', 'instagram', 'whatsapp', etc.
+      platform_id VARCHAR(255),       -- phone number, username, or account id
+      platform_name VARCHAR(255),     -- display name from platform
+      
+      -- Authentication
+      access_token TEXT,              -- session_string for Telegram, access_token for others
+      refresh_token TEXT,
+      token_expires_at TIMESTAMP,
+      
+      -- Status
+      is_active BOOLEAN DEFAULT true,
+      is_connected BOOLEAN DEFAULT false,
+      connection_error TEXT,
+      last_connected_at TIMESTAMP,
+      last_sync_at TIMESTAMP,
+      
+      -- Settings (platform-specific)
+      settings JSONB DEFAULT '{}',
+      
+      -- Metadata
+      metadata JSONB DEFAULT '{}',
+      
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      
+      UNIQUE(org_id, platform, platform_id)
+    );
+
+    -- Telegram-specific settings
+    CREATE TABLE IF NOT EXISTS nexik_telegram_settings (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      integration_id UUID NOT NULL REFERENCES nexik_integrations(id) ON DELETE CASCADE,
+      
+      -- Response modes
+      respond_to_all BOOLEAN DEFAULT true,           -- Respond to all messages
+      respond_to_questions_only BOOLEAN DEFAULT false, -- Only respond to questions
+      respond_to_mentions BOOLEAN DEFAULT true,       -- Respond when mentioned
+      
+      -- Message type filters
+      process_text BOOLEAN DEFAULT true,
+      process_voice BOOLEAN DEFAULT true,
+      process_photos BOOLEAN DEFAULT false,
+      process_documents BOOLEAN DEFAULT false,
+      process_stickers BOOLEAN DEFAULT false,
+      
+      -- Delay settings
+      typing_delay_ms INTEGER DEFAULT 1000,           -- Delay before "typing..."
+      response_delay_ms INTEGER DEFAULT 2000,         -- Delay before sending response
+      
+      -- Auto-reply settings
+      auto_reply_enabled BOOLEAN DEFAULT true,
+      auto_reply_delay_seconds INTEGER DEFAULT 5,
+      
+      -- Notification settings
+      notify_on_new_chat BOOLEAN DEFAULT true,
+      notify_on_keywords TEXT[] DEFAULT '{}',
+      
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      
+      UNIQUE(org_id, integration_id)
+    );
+
+    -- Telegram exceptions (users, words, phrases to ignore)
+    CREATE TABLE IF NOT EXISTS nexik_telegram_exceptions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      integration_id UUID REFERENCES nexik_integrations(id) ON DELETE CASCADE,
+      
+      -- Exception type
+      exception_type VARCHAR(50) NOT NULL,  -- 'user', 'chat', 'keyword', 'phrase', 'regex'
+      
+      -- Value to match
+      value TEXT NOT NULL,
+      value_normalized TEXT,  -- lowercase for case-insensitive matching
+      
+      -- Mode: 'ignore' (don't respond) or 'notify' (notify operator only)
+      mode VARCHAR(20) DEFAULT 'ignore',
+      
+      -- Optional description
+      description TEXT,
+      
+      is_active BOOLEAN DEFAULT true,
+      
+      created_at TIMESTAMP DEFAULT NOW(),
+      
+      UNIQUE(org_id, integration_id, exception_type, value)
+    );
+
+    -- Telegram chat sync history
+    CREATE TABLE IF NOT EXISTS nexik_telegram_chats (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      integration_id UUID NOT NULL REFERENCES nexik_integrations(id) ON DELETE CASCADE,
+      
+      -- Telegram chat info
+      telegram_chat_id BIGINT NOT NULL,
+      chat_type VARCHAR(50),  -- 'private', 'group', 'supergroup', 'channel'
+      chat_title VARCHAR(500),
+      chat_username VARCHAR(255),
+      
+      -- Participant info (for private chats)
+      participant_id BIGINT,
+      participant_name VARCHAR(255),
+      participant_username VARCHAR(255),
+      participant_phone VARCHAR(50),
+      
+      -- Link to nexik conversation
+      conversation_id UUID REFERENCES nexik_conversations(id) ON DELETE SET NULL,
+      
+      -- Sync state
+      last_message_id BIGINT,
+      last_message_at TIMESTAMP,
+      is_syncing BOOLEAN DEFAULT false,
+      sync_error TEXT,
+      
+      -- Settings for this specific chat
+      is_muted BOOLEAN DEFAULT false,
+      auto_respond BOOLEAN DEFAULT true,
+      
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      
+      UNIQUE(integration_id, telegram_chat_id)
+    );
+
+    -- Telegram message sync
+    CREATE TABLE IF NOT EXISTS nexik_telegram_messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      org_id UUID NOT NULL REFERENCES nexik_organizations(id) ON DELETE CASCADE,
+      integration_id UUID NOT NULL REFERENCES nexik_integrations(id) ON DELETE CASCADE,
+      chat_id UUID NOT NULL REFERENCES nexik_telegram_chats(id) ON DELETE CASCADE,
+      
+      -- Telegram message info
+      telegram_message_id BIGINT NOT NULL,
+      telegram_chat_id BIGINT NOT NULL,
+      
+      -- Sender
+      sender_id BIGINT,
+      sender_name VARCHAR(255),
+      sender_username VARCHAR(255),
+      is_outgoing BOOLEAN DEFAULT false,
+      
+      -- Content
+      message_type VARCHAR(50) DEFAULT 'text',  -- 'text', 'voice', 'photo', 'document', 'sticker'
+      content TEXT,
+      media_url TEXT,
+      media_metadata JSONB,
+      
+      -- Reply info
+      reply_to_message_id BIGINT,
+      
+      -- Link to nexik message
+      nexik_message_id UUID REFERENCES nexik_messages(id) ON DELETE SET NULL,
+      
+      -- AI processing
+      ai_processed BOOLEAN DEFAULT false,
+      ai_response_id UUID,
+      
+      -- Timestamps
+      telegram_date TIMESTAMP,
+      created_at TIMESTAMP DEFAULT NOW(),
+      
+      UNIQUE(integration_id, telegram_message_id)
+    );
+
+    -- Indexes for integrations
+    CREATE INDEX IF NOT EXISTS idx_nexik_integrations_org ON nexik_integrations(org_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_integrations_platform ON nexik_integrations(org_id, platform);
+    CREATE INDEX IF NOT EXISTS idx_nexik_integrations_active ON nexik_integrations(org_id, is_active);
+    
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_settings_org ON nexik_telegram_settings(org_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_settings_int ON nexik_telegram_settings(integration_id);
+    
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_exceptions_org ON nexik_telegram_exceptions(org_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_exceptions_type ON nexik_telegram_exceptions(org_id, exception_type);
+    
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_chats_org ON nexik_telegram_chats(org_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_chats_int ON nexik_telegram_chats(integration_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_chats_tg ON nexik_telegram_chats(integration_id, telegram_chat_id);
+    
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_messages_chat ON nexik_telegram_messages(chat_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_messages_tg ON nexik_telegram_messages(integration_id, telegram_message_id);
+    CREATE INDEX IF NOT EXISTS idx_nexik_telegram_messages_date ON nexik_telegram_messages(chat_id, telegram_date DESC);
   `)
   // Database schema initialized
 }
