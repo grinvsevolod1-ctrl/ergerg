@@ -43,65 +43,121 @@ interface ExtractedFact {
 function extractFactsFromResponse(response: string, userInput: string): ExtractedFact[] {
   const facts: ExtractedFact[] = []
   const combinedText = `${userInput} ${response}`
+  const lowerCombined = combinedText.toLowerCase()
   
-  // Паттерны для извлечения
-  const patterns = [
-    { regex: /название.*?[«"]([^»"]+)[»"]/gi, category: 'business_name' },
-    { regex: /(?:компания|бизнес|магазин|салон|студия|кабинет)\s+[«"]?([^»",\n]+)[»"]?/gi, category: 'business_name' },
-    { regex: /(?:занимаемся|предоставляем|продаём|делаем|услуг[аи])\s+(.+?)(?:\.|,|$)/gim, category: 'services' },
-    { regex: /(?:клиенты|аудитория).*?[-–:]\s*(.+?)(?:\.|$)/gim, category: 'target_audience' },
-    { regex: /(?:работаем|график|расписание|время работы)\s+(.+?)(?:\.|$)/gim, category: 'working_hours' },
-    { regex: /(?:телефон|звонить|номер).*?(\+?\d[\d\s()-]{9,})/gi, category: 'contact' },
-    { regex: /(?:email|почта|e-mail).*?([\w.-]+@[\w.-]+)/gi, category: 'contact' },
-    { regex: /(?:адрес|находимся|расположен|кабинет по адресу)\s+(.+?)(?:\.|,|$)/gim, category: 'address' },
-    { regex: /(\d+)\s*(?:руб|рублей|р\.|BYN|бел)/gi, category: 'pricing' },
-    { regex: /(?:цена|стоимость|стоит)\s+(.+?)(?:\.|$)/gim, category: 'pricing' },
-    { regex: /(?:противопоказани[яе]|нельзя|запрещено)\s*[:\s]*(.+?)(?:\.|$)/gim, category: 'restrictions' },
-  ]
+  // Простое извлечение - каждое предложение пользователя это потенциальный факт
+  const sentences = userInput.split(/[.!?\n]+/).filter(s => s.trim().length > 10)
   
-  for (const { regex, category } of patterns) {
-    let match
-    // Reset regex lastIndex
-    regex.lastIndex = 0
-    while ((match = regex.exec(combinedText)) !== null) {
-      if (match[1] && match[1].trim().length > 2 && match[1].trim().length < 500) {
-        // Проверяем что факт не дублируется
-        const factText = match[1].trim()
-        if (!facts.some(f => f.fact.toLowerCase() === factText.toLowerCase())) {
-          facts.push({
-            fact: factText,
-            category,
-            confidence: 0.7
-          })
-        }
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim()
+    if (trimmed.length > 10 && trimmed.length < 500) {
+      // Определяем категорию по ключевым словам
+      let category = 'general'
+      const lower = trimmed.toLowerCase()
+      
+      if (/название|компания|бизнес|называется|наз[ыв]|мы\s+[-–]\s+/.test(lower)) {
+        category = 'business_name'
+      } else if (/услуг|делаем|предоставляем|занимаемся|работаем над|выполняем/.test(lower)) {
+        category = 'services'
+      } else if (/клиент|аудитор|покупател|заказчик|для кого/.test(lower)) {
+        category = 'target_audience'
+      } else if (/работаем|график|время|час|расписание|открыт|закрыт/.test(lower)) {
+        category = 'working_hours'
+      } else if (/телефон|звонить|номер|\+\d|mail|почта|контакт/.test(lower)) {
+        category = 'contact'
+      } else if (/адрес|находим|расположен|город|улица|офис|кабинет/.test(lower)) {
+        category = 'address'
+      } else if (/руб|цена|стоим|стоит|тариф|прайс|\d+\s*р\.?/.test(lower)) {
+        category = 'pricing'
+      } else if (/противопоказ|нельзя|запрещ|ограничен|не рекомен/.test(lower)) {
+        category = 'restrictions'
+      } else if (/преимущ|особен|уникал|отлича|лучш|качеств/.test(lower)) {
+        category = 'advantages'
+      }
+      
+      // Не дублируем факты
+      if (!facts.some(f => f.fact.toLowerCase() === trimmed.toLowerCase())) {
+        facts.push({
+          fact: trimmed,
+          category,
+          confidence: category === 'general' ? 0.5 : 0.8
+        })
       }
     }
   }
   
-  // Извлекаем ключевые данные из структурированного текста (списки с временем, ценами)
-  const listPatterns = [
-    /(?:^|\n)\s*([А-Яа-яЁё\w\s]+)\s*[:\-–]\s*(\d+[^\n]+)/gm, // "Услуга: цена/время"
-    /(?:^|\n)\s*(\d+)\.\s*([^\n]+)/gm, // "1. Пункт списка"
-  ]
+  return facts.slice(0, 15)
+}
+
+// Извлечение структурированных данных для обновления профиля
+function extractProfileData(userInput: string): Record<string, string | string[]> {
+  const data: Record<string, string | string[]> = {}
+  const lower = userInput.toLowerCase()
   
-  for (const pattern of listPatterns) {
-    let match
-    pattern.lastIndex = 0
-    while ((match = pattern.exec(userInput)) !== null) {
-      const fullMatch = `${match[1]}: ${match[2] || ''}`.trim()
-      if (fullMatch.length > 5 && fullMatch.length < 200) {
-        if (!facts.some(f => f.fact.includes(match[1].trim()))) {
-          facts.push({
-            fact: fullMatch,
-            category: 'service_details',
-            confidence: 0.8
-          })
-        }
-      }
+  // Название бизнеса - ищем шаблоны
+  const namePatterns = [
+    /(?:называ[ею]тся|название|компания|бизнес|мы\s*[-–]\s*это)\s*[«""]?([^»"".,\n]{3,100})[»""]?/i,
+    /^([^.!?\n]{5,50})(?:\s*[-–]\s*это|\s+занима)/i,
+  ]
+  for (const p of namePatterns) {
+    const m = userInput.match(p)
+    if (m && m[1] && m[1].trim().length > 2) {
+      data.business_name = m[1].trim()
+      break
     }
   }
   
-  return facts.slice(0, 20) // Ограничиваем количество фактов за раз
+  // Услуги - собираем все упоминания
+  const services: string[] = []
+  const servicePatterns = [
+    /(?:услуги?|делаем|предоставляем|занимаемся)\s*[:\-–]?\s*([^.!?\n]+)/gi,
+    /(?:^|\n)\s*[-•]\s*([^.!?\n]{5,100})/gm,
+  ]
+  for (const p of servicePatterns) {
+    let m
+    while ((m = p.exec(userInput)) !== null) {
+      if (m[1] && m[1].trim().length > 3) {
+        services.push(m[1].trim())
+      }
+    }
+  }
+  if (services.length > 0) {
+    data.services = services.slice(0, 10)
+  }
+  
+  // Отрасль
+  const industryKeywords: Record<string, string> = {
+    'салон красоты|парикмахерская|маникюр|педикюр|косметолог': 'Красота и уход',
+    'массаж|spa|спа': 'Здоровье и SPA',
+    'автосервис|автомобил|шиномонтаж|авто': 'Автосервис',
+    'ресторан|кафе|еда|доставка еды|кухня': 'Общественное питание',
+    'магазин|продажа|товар|интернет-магазин': 'Розничная торговля',
+    'клиника|медицин|врач|стоматолог|здоровь': 'Медицина',
+    'фитнес|спорт|тренажер|йога': 'Фитнес и спорт',
+    'юрист|адвокат|правов': 'Юридические услуги',
+    'ремонт|строител|отделк': 'Строительство и ремонт',
+    'образован|курсы|обучен|школа': 'Образование',
+  }
+  
+  for (const [keywords, industry] of Object.entries(industryKeywords)) {
+    if (new RegExp(keywords, 'i').test(lower)) {
+      data.industry = industry
+      break
+    }
+  }
+  
+  // Контакты
+  const phoneMatch = userInput.match(/(\+?\d[\d\s()-]{9,})/g)
+  if (phoneMatch) {
+    data.contact_phone = phoneMatch[0].replace(/\s+/g, ' ').trim()
+  }
+  
+  const emailMatch = userInput.match(/([\w.-]+@[\w.-]+\.[a-z]{2,})/i)
+  if (emailMatch) {
+    data.contact_email = emailMatch[1]
+  }
+  
+  return data
 }
 
 // Лимиты для сообщений
@@ -228,8 +284,12 @@ export async function POST(request: NextRequest) {
   // Extract facts from conversation
   const extractedFacts = extractFactsFromResponse(aiResult.response, message)
   
-  // Update learned facts if any
-  if (extractedFacts.length > 0) {
+  // Extract structured profile data
+  const profileData = extractProfileData(message)
+  
+  // Update learned facts and profile data
+  if (extractedFacts.length > 0 || Object.keys(profileData).length > 0) {
+    // Prepare facts for storage
     const newFacts = extractedFacts.map(f => ({
       fact: f.fact,
       category: f.category,
@@ -237,13 +297,55 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     }))
     
-    await execute(
-      `UPDATE nexik_business_profiles 
-       SET ai_learned_facts = COALESCE(ai_learned_facts, '[]'::jsonb) || $1::jsonb,
-           updated_at = NOW()
-       WHERE org_id = $2`,
-      [JSON.stringify(newFacts), orgId]
-    )
+    // Build dynamic update query
+    const updates: string[] = []
+    const values: (string | null)[] = [orgId]
+    let paramIndex = 2
+    
+    // Always add facts if any
+    if (newFacts.length > 0) {
+      updates.push(`ai_learned_facts = COALESCE(ai_learned_facts, '[]'::jsonb) || $${paramIndex}::jsonb`)
+      values.push(JSON.stringify(newFacts))
+      paramIndex++
+    }
+    
+    // Add profile fields if extracted
+    if (profileData.business_name) {
+      updates.push(`business_name = COALESCE(business_name, $${paramIndex})`)
+      values.push(profileData.business_name as string)
+      paramIndex++
+    }
+    if (profileData.industry) {
+      updates.push(`industry = COALESCE(industry, $${paramIndex})`)
+      values.push(profileData.industry as string)
+      paramIndex++
+    }
+    if (profileData.contact_phone) {
+      updates.push(`contact_phone = COALESCE(contact_phone, $${paramIndex})`)
+      values.push(profileData.contact_phone as string)
+      paramIndex++
+    }
+    if (profileData.contact_email) {
+      updates.push(`contact_email = COALESCE(contact_email, $${paramIndex})`)
+      values.push(profileData.contact_email as string)
+      paramIndex++
+    }
+    if (profileData.services && Array.isArray(profileData.services) && profileData.services.length > 0) {
+      updates.push(`services = COALESCE(services, ARRAY[]::text[]) || $${paramIndex}::text[]`)
+      values.push(JSON.stringify(profileData.services).replace(/^\[/, '{').replace(/\]$/, '}'))
+      paramIndex++
+    }
+    
+    updates.push('updated_at = NOW()')
+    
+    if (updates.length > 1) { // More than just updated_at
+      await execute(
+        `UPDATE nexik_business_profiles 
+         SET ${updates.join(', ')}
+         WHERE org_id = $1`,
+        values
+      )
+    }
   }
   
   return NextResponse.json({
