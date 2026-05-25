@@ -317,64 +317,71 @@ export async function POST(request: NextRequest) {
   const profileData = extractProfileData(message)
   
   // Update learned facts and profile data
-  if (extractedFacts.length > 0 || Object.keys(profileData).length > 0) {
-    // Prepare facts for storage
-    const newFacts = extractedFacts.map(f => ({
-      fact: f.fact,
-      category: f.category,
-      source: 'training_chat',
-      timestamp: new Date().toISOString()
-    }))
-    
-    // Build dynamic update query
-    const updates: string[] = []
-    const values: (string | null)[] = [orgId]
-    let paramIndex = 2
-    
-    // Always add facts if any
-    if (newFacts.length > 0) {
-      updates.push(`ai_learned_facts = COALESCE(ai_learned_facts, '[]'::jsonb) || $${paramIndex}::jsonb`)
-      values.push(JSON.stringify(newFacts))
-      paramIndex++
+  try {
+    if (extractedFacts.length > 0 || Object.keys(profileData).length > 0) {
+      // Prepare facts for storage
+      const newFacts = extractedFacts.map(f => ({
+        fact: f.fact,
+        category: f.category,
+        source: 'training_chat',
+        timestamp: new Date().toISOString()
+      }))
+      
+      // Build dynamic update query
+      const updates: string[] = []
+      const values: (string | null)[] = [orgId]
+      let paramIndex = 2
+      
+      // Always add facts if any
+      if (newFacts.length > 0) {
+        updates.push(`ai_learned_facts = COALESCE(ai_learned_facts, '[]'::jsonb) || $${paramIndex}::jsonb`)
+        values.push(JSON.stringify(newFacts))
+        paramIndex++
+      }
+      
+      // Add profile fields if extracted
+      if (profileData.business_name) {
+        updates.push(`business_name = COALESCE(business_name, $${paramIndex})`)
+        values.push(profileData.business_name as string)
+        paramIndex++
+      }
+      if (profileData.industry) {
+        updates.push(`industry = COALESCE(industry, $${paramIndex})`)
+        values.push(profileData.industry as string)
+        paramIndex++
+      }
+      if (profileData.contact_phone) {
+        updates.push(`contact_phone = COALESCE(contact_phone, $${paramIndex})`)
+        values.push(profileData.contact_phone as string)
+        paramIndex++
+      }
+      if (profileData.contact_email) {
+        updates.push(`contact_email = COALESCE(contact_email, $${paramIndex})`)
+        values.push(profileData.contact_email as string)
+        paramIndex++
+      }
+      if (profileData.services && Array.isArray(profileData.services) && profileData.services.length > 0) {
+        updates.push(`services = COALESCE(services, ARRAY[]::text[]) || $${paramIndex}::text[]`)
+        // Properly format PostgreSQL array: {item1,item2,item3}
+        const pgArray = '{' + (profileData.services as string[]).map(s => `"${s.replace(/"/g, '\\"')}"`).join(',') + '}'
+        values.push(pgArray)
+        paramIndex++
+      }
+      
+      updates.push('updated_at = NOW()')
+      
+      if (updates.length > 1) { // More than just updated_at
+        await execute(
+          `UPDATE nexik_business_profiles 
+           SET ${updates.join(', ')}
+           WHERE org_id = $1`,
+          values
+        )
+      }
     }
-    
-    // Add profile fields if extracted
-    if (profileData.business_name) {
-      updates.push(`business_name = COALESCE(business_name, $${paramIndex})`)
-      values.push(profileData.business_name as string)
-      paramIndex++
-    }
-    if (profileData.industry) {
-      updates.push(`industry = COALESCE(industry, $${paramIndex})`)
-      values.push(profileData.industry as string)
-      paramIndex++
-    }
-    if (profileData.contact_phone) {
-      updates.push(`contact_phone = COALESCE(contact_phone, $${paramIndex})`)
-      values.push(profileData.contact_phone as string)
-      paramIndex++
-    }
-    if (profileData.contact_email) {
-      updates.push(`contact_email = COALESCE(contact_email, $${paramIndex})`)
-      values.push(profileData.contact_email as string)
-      paramIndex++
-    }
-    if (profileData.services && Array.isArray(profileData.services) && profileData.services.length > 0) {
-      updates.push(`services = COALESCE(services, ARRAY[]::text[]) || $${paramIndex}::text[]`)
-      values.push(JSON.stringify(profileData.services).replace(/^\[/, '{').replace(/\]$/, '}'))
-      paramIndex++
-    }
-    
-    updates.push('updated_at = NOW()')
-    
-    if (updates.length > 1) { // More than just updated_at
-      await execute(
-        `UPDATE nexik_business_profiles 
-         SET ${updates.join(', ')}
-         WHERE org_id = $1`,
-        values
-      )
-    }
+  } catch (dbError) {
+    // Log error but don't fail the request - AI response was successful
+    console.error('[Nexik Train] Failed to update profile:', dbError)
   }
   
   return NextResponse.json({
