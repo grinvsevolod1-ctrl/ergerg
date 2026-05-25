@@ -152,57 +152,116 @@ function DotGrid() {
   )
 }
 
-// Animated arrow pointing to chat
-function AnimatedArrow({ direction, delay = 0 }: { direction: 'left' | 'right', delay?: number }) {
+// Curved arrow with animated dot traveling along the path
+function CurvedArrow({ direction, delay = 0 }: { direction: 'left' | 'right', delay?: number }) {
+  const pathId = `curvedPath-${direction}`
+  const gradientId = `arrowGrad-${direction}`
+  
+  // Bezier curve paths - curved arrows pointing toward center
+  const pathD = direction === 'left' 
+    ? "M 10 75 C 60 30, 120 120, 180 75" // curves from left, arcs up then down toward right
+    : "M 180 75 C 130 30, 70 120, 10 75"  // curves from right, arcs up then down toward left
+  
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ delay: delay + 0.5, duration: 0.5 }}
-      className={`hidden lg:block absolute top-1/2 -translate-y-1/2 ${
-        direction === 'left' ? '-right-8' : '-left-8'
+      transition={{ delay: delay + 0.3, duration: 0.6 }}
+      className={`hidden lg:block absolute top-1/2 -translate-y-1/2 pointer-events-none ${
+        direction === 'left' ? '-right-12' : '-left-12'
       }`}
     >
-      <motion.svg
-        width="32"
-        height="24"
-        viewBox="0 0 32 24"
-        fill="none"
-        className={direction === 'right' ? 'rotate-180' : ''}
+      <svg 
+        width="200" 
+        height="150" 
+        viewBox="0 0 200 150"
+        className="overflow-visible"
+        style={{ transform: direction === 'left' ? 'scaleX(-1)' : 'none' }}
       >
-        <motion.path
-          d="M0 12 C8 12, 16 12, 24 12 M24 12 L16 4 M24 12 L16 20"
-          stroke="url(#arrowGradient)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={{ delay: delay + 0.8, duration: 0.6, ease: "easeOut" }}
-        />
         <defs>
-          <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(34,211,238,0.2)" />
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(34,211,238,0.1)" />
+            <stop offset="50%" stopColor="rgba(34,211,238,0.4)" />
             <stop offset="100%" stopColor="rgba(34,211,238,0.6)" />
           </linearGradient>
+          
+          {/* Glow filter */}
+          <filter id={`glow-${direction}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
         </defs>
-      </motion.svg>
-      <motion.div
-        className="absolute top-1/2 -translate-y-1/2"
-        style={{ [direction === 'left' ? 'right' : 'left']: '-4px' }}
-        animate={{ 
-          x: direction === 'left' ? [0, 4, 0] : [0, -4, 0],
-          opacity: [0.4, 1, 0.4]
-        }}
-        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <div className="w-2 h-2 rounded-full bg-cyan-400/60" />
-      </motion.div>
+        
+        {/* Dashed curved path */}
+        <motion.path
+          d={pathD}
+          stroke={`url(#${gradientId})`}
+          strokeWidth="2"
+          strokeDasharray="8 6"
+          fill="none"
+          strokeLinecap="round"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ delay: delay + 0.5, duration: 1, ease: "easeOut" }}
+        />
+        
+        {/* Arrow head at the end */}
+        <motion.path
+          d={direction === 'left' 
+            ? "M 170 65 L 180 75 L 170 85" 
+            : "M 20 65 L 10 75 L 20 85"
+          }
+          stroke="rgba(34,211,238,0.6)"
+          strokeWidth="2"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: delay + 1.2, duration: 0.3 }}
+        />
+        
+        {/* Animated glowing dot traveling along path */}
+        <motion.circle
+          r="5"
+          fill="#22d3ee"
+          filter={`url(#glow-${direction})`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 1, 1, 0] }}
+          transition={{ delay: delay + 1, duration: 2.5, repeat: Infinity, repeatDelay: 0.5 }}
+        >
+          <animateMotion
+            dur="2.5s"
+            repeatCount="indefinite"
+            begin={`${delay + 1}s`}
+            path={pathD}
+          />
+        </motion.circle>
+        
+        {/* Secondary smaller dot with trail effect */}
+        <motion.circle
+          r="3"
+          fill="rgba(34,211,238,0.5)"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.7, 0.7, 0] }}
+          transition={{ delay: delay + 1.3, duration: 2.5, repeat: Infinity, repeatDelay: 0.5 }}
+        >
+          <animateMotion
+            dur="2.5s"
+            repeatCount="indefinite"
+            begin={`${delay + 1.3}s`}
+            path={pathD}
+          />
+        </motion.circle>
+      </svg>
     </motion.div>
   )
 }
 
-// Quick action button with hover effect
+// Quick action button with enhanced hover effects and glow
 function QuickActionButton({ 
   action, 
   onClick, 
@@ -216,33 +275,66 @@ function QuickActionButton({
 }) {
   return (
     <motion.button
-      initial={{ opacity: 0, x: side === 'left' ? -20 : side === 'right' ? 20 : 0, y: side ? 0 : 10 }}
-      animate={{ opacity: 1, x: 0, y: 0 }}
-      transition={{ delay, duration: 0.4, ease: "easeOut" }}
+      initial={{ opacity: 0, x: side === 'left' ? -30 : side === 'right' ? 30 : 0, y: side ? 0 : 15, rotate: side ? (side === 'left' ? -5 : 5) : 0 }}
+      animate={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
+      transition={{ delay, duration: 0.5, type: "spring", stiffness: 100 }}
       onClick={onClick}
-      className="group relative px-4 py-2.5 rounded-xl text-sm font-medium text-zinc-400 transition-all duration-300 whitespace-nowrap"
+      className="group relative px-5 py-3 rounded-2xl text-sm font-medium text-zinc-400 transition-all duration-300 whitespace-nowrap overflow-hidden"
       style={{
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+        border: "1px solid rgba(34,211,238,0.15)",
+        boxShadow: "0 0 20px rgba(34,211,238,0.03)",
       }}
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ 
+        scale: 1.05,
+        transition: { duration: 0.2 }
+      }}
       whileTap={{ scale: 0.98 }}
     >
-      <span className="relative z-10 group-hover:text-cyan-300 transition-colors">{action}</span>
+      {/* Background gradient on hover */}
       <motion.div
-        className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
         style={{
-          background: "linear-gradient(135deg, rgba(34,211,238,0.1) 0%, rgba(34,211,238,0.05) 100%)",
-          border: "1px solid rgba(34,211,238,0.2)",
+          background: "linear-gradient(135deg, rgba(34,211,238,0.15) 0%, rgba(34,211,238,0.05) 100%)",
         }}
       />
+      
+      {/* Border glow on hover */}
       <motion.div
-        className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100"
+        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
         style={{
-          boxShadow: "0 0 20px rgba(34,211,238,0.15)",
+          border: "1px solid rgba(34,211,238,0.4)",
+          boxShadow: "0 0 25px rgba(34,211,238,0.2), inset 0 0 15px rgba(34,211,238,0.05)",
         }}
-        transition={{ duration: 0.3 }}
       />
+      
+      {/* Shimmer effect */}
+      <motion.div
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+        style={{
+          background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)",
+          transform: "translateX(-100%)",
+        }}
+        whileHover={{
+          transform: "translateX(100%)",
+          transition: { duration: 0.6, ease: "easeInOut" }
+        }}
+      />
+      
+      {/* Text */}
+      <span className="relative z-10 group-hover:text-cyan-300 transition-colors duration-200">
+        {action}
+      </span>
+      
+      {/* Sparkle icon on hover */}
+      <motion.span
+        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        initial={false}
+        animate={{ rotate: [0, 15, -15, 0] }}
+        transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+      >
+        <Sparkles className="w-3.5 h-3.5 text-cyan-400/70" />
+      </motion.span>
     </motion.button>
   )
 }
@@ -386,16 +478,26 @@ function ChatDemo({ visible, showQuickActions = false, quickActionTrigger }: Cha
         style={{
           background: "linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 50%, rgba(0,255,255,0.03) 100%)",
           backdropFilter: "blur(24px)",
-          boxShadow: "0 0 0 1px rgba(255,255,255,0.1), 0 0 60px -10px rgba(0,255,255,0.15), 0 40px 80px -20px rgba(0,0,0,0.6)",
+          boxShadow: "0 0 0 1px rgba(255,255,255,0.1), 0 0 80px -10px rgba(0,255,255,0.2), 0 50px 100px -30px rgba(0,0,0,0.7)",
         }}
       >
+        {/* Gradient border overlay */}
         <div 
           className="absolute inset-0 rounded-3xl pointer-events-none"
           style={{
-            background: "linear-gradient(135deg, rgba(0,255,255,0.1) 0%, transparent 50%, rgba(0,255,255,0.05) 100%)",
+            background: "linear-gradient(135deg, rgba(0,255,255,0.15) 0%, transparent 40%, transparent 60%, rgba(0,255,255,0.1) 100%)",
             mask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
             maskComposite: "exclude",
+            WebkitMaskComposite: "xor",
             padding: "1px",
+          }}
+        />
+        
+        {/* Inner glow at top */}
+        <div 
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at center top, rgba(34,211,238,0.15) 0%, transparent 70%)",
           }}
         />
         
@@ -782,7 +884,7 @@ export default function NexikPage() {
                         delay={0.3 + i * 0.1}
                         side="left"
                       />
-                      {i === 1 && <AnimatedArrow direction="left" delay={0.5} />}
+                      {i === 1 && <CurvedArrow direction="left" delay={0.5} />}
                     </div>
                   ))}
                 </div>
@@ -806,7 +908,7 @@ export default function NexikPage() {
                         delay={0.4 + i * 0.1}
                         side="right"
                       />
-                      {i === 1 && <AnimatedArrow direction="right" delay={0.6} />}
+                      {i === 1 && <CurvedArrow direction="right" delay={0.6} />}
                     </div>
                   ))}
                 </div>
