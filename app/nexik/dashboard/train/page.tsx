@@ -32,6 +32,10 @@ interface BusinessProfile {
   onboarding_completed: boolean
 }
 
+// Лимиты для сообщений (должны соответствовать бэкенду)
+const MAX_MESSAGE_LENGTH = 10000
+const WARNING_THRESHOLD = 8000
+
 const QUICK_TOPICS = [
   { icon: Building2, label: "О компании", prompt: "Расскажу о своей компании", color: "cyan" },
   { icon: FileText, label: "Услуги", prompt: "Хочу рассказать о наших услугах", color: "purple" },
@@ -46,6 +50,7 @@ export default function TrainPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [input, setInput] = useState("")
+  const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   useEffect(() => {
@@ -97,6 +102,14 @@ export default function TrainPage() {
     const messageText = text || input.trim()
     if (!messageText || sending) return
     
+    // Проверка длины на клиенте
+    if (messageText.length > MAX_MESSAGE_LENGTH) {
+      setError(`Сообщение слишком длинное (${messageText.length} символов). Максимум ${MAX_MESSAGE_LENGTH}. Разбейте на несколько сообщений.`)
+      return
+    }
+    
+    setError(null)
+    
     const userMessage: Message = {
       id: `user_${Date.now()}`,
       role: 'user',
@@ -131,9 +144,16 @@ export default function TrainPage() {
         if (profileData.profile) {
           setProfile(profileData.profile)
         }
+      } else {
+        // Показываем ошибку от сервера
+        setError(data.error || 'Не удалось отправить сообщение')
+        // Удаляем сообщение пользователя из истории при ошибке
+        setMessages(prev => prev.filter(m => m.id !== userMessage.id))
       }
     } catch (e) {
       console.error("Failed to send message:", e)
+      setError('Ошибка соединения. Попробуйте еще раз.')
+      setMessages(prev => prev.filter(m => m.id !== userMessage.id))
     } finally {
       setSending(false)
     }
@@ -286,18 +306,51 @@ export default function TrainPage() {
         <div className="p-4 border-t border-white/10"
           style={{ background: "rgba(255,255,255,0.02)" }}
         >
+          {/* Error message */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mb-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm"
+              >
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
           <div className="flex gap-2">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Расскажите о вашем бизнесе..."
-              rows={1}
-              className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-black/20 text-white placeholder:text-white/30 focus:outline-none focus:border-cyan-500/50 resize-none transition-colors"
-            />
+            <div className="flex-1 relative">
+              <textarea
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  if (error) setError(null)
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Расскажите о вашем бизнесе..."
+                rows={1}
+                className={`w-full px-4 py-3 rounded-xl border bg-black/20 text-white placeholder:text-white/30 focus:outline-none resize-none transition-colors ${
+                  input.length > MAX_MESSAGE_LENGTH 
+                    ? 'border-red-500/50 focus:border-red-500' 
+                    : input.length > WARNING_THRESHOLD 
+                      ? 'border-orange-500/50 focus:border-orange-500' 
+                      : 'border-white/10 focus:border-cyan-500/50'
+                }`}
+              />
+              {/* Character counter */}
+              {input.length > WARNING_THRESHOLD && (
+                <div className={`absolute right-3 bottom-1 text-xs ${
+                  input.length > MAX_MESSAGE_LENGTH ? 'text-red-400' : 'text-orange-400'
+                }`}>
+                  {input.length} / {MAX_MESSAGE_LENGTH}
+                </div>
+              )}
+            </div>
             <button
               onClick={() => sendMessage()}
-              disabled={sending || !input.trim()}
+              disabled={sending || !input.trim() || input.length > MAX_MESSAGE_LENGTH}
               className="px-5 py-3 bg-gradient-to-r from-cyan-500 to-cyan-400 text-black rounded-xl font-medium hover:from-cyan-400 hover:to-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {sending ? (

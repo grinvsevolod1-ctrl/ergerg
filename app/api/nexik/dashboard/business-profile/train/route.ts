@@ -104,6 +104,10 @@ function extractFactsFromResponse(response: string, userInput: string): Extracte
   return facts.slice(0, 20) // Ограничиваем количество фактов за раз
 }
 
+// Лимиты для сообщений
+const MAX_MESSAGE_LENGTH = 10000 // ~10K символов - примерно 2500 токенов
+const MAX_TOKENS_RESPONSE = 2000 // Увеличенный лимит для полноценных ответов
+
 export async function POST(request: NextRequest) {
   const session = await getSession()
   if (!session) {
@@ -116,6 +120,16 @@ export async function POST(request: NextRequest) {
   
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'Message required' }, { status: 400 })
+  }
+  
+  // Проверка длины сообщения
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json({ 
+      error: `Сообщение слишком длинное (${message.length} символов). Максимум ${MAX_MESSAGE_LENGTH} символов. Пожалуйста, разбейте информацию на несколько сообщений.`,
+      code: 'MESSAGE_TOO_LONG',
+      maxLength: MAX_MESSAGE_LENGTH,
+      actualLength: message.length
+    }, { status: 400 })
   }
   
   // Get business profile
@@ -182,12 +196,12 @@ export async function POST(request: NextRequest) {
   try {
     aiResult = await routedChat(
       'simple',
-      [...historyForAI, { role: 'user', content: message.substring(0, 5000) }],
+      [...historyForAI, { role: 'user', content: message.substring(0, MAX_MESSAGE_LENGTH) }],
       {
         model: AI_SERVERS.fast.defaultModel,
         system: systemPrompt,
         temperature: 0.7,
-        maxTokens: 1000 // Увеличиваем лимит токенов для полноценного ответа
+        maxTokens: MAX_TOKENS_RESPONSE
       }
     )
   } catch (error) {
