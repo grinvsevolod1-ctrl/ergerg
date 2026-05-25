@@ -14,7 +14,7 @@ import base64, hashlib, os
 import asyncio
 import logging
 from typing import Dict, Any, Optional
-from .queue_service import with_flood_retry, flood_manager
+from queue_service import with_flood_retry, flood_manager
 
 logger = logging.getLogger(__name__)
 
