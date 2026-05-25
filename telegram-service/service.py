@@ -20,6 +20,17 @@ ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', 'd03a026281d195e29be1e1499780d9e7')
 # Init TelegramService with CLIENT_PARAMS
 telegram_service = TelegramService(API_ID, API_HASH, ENCRYPTION_KEY)
 
+async def health(request):
+    """Health check endpoint."""
+    return web.json_response({
+        'status': 'ok',
+        'service': 'telegram-service',
+        'version': '1.0.0'
+    })
+
+async def ping(request):
+    return web.json_response({'status': 'ok', 'service': 'telegram-service'})
+
 async def send_code(request):
     """Send verification code to phone number."""
     try:
@@ -130,20 +141,6 @@ async def decrypt_session(request):
     except Exception as e:
         return web.json_response({'error': str(e)}, status=400)
 
-async def ping(request):
-    return web.json_response({'status': 'ok', 'service': 'telegram-service'})
-
-app = web.Application()
-app.router.add_post('/send-code', send_code)
-app.router.add_post('/sign-in', sign_in)
-app.router.add_post('/check-2fa', check_2fa)
-app.router.add_post('/decrypt', decrypt_session)
-app.router.add_get('/ping', ping)
-
-if __name__ == '__main__':
-    print("Telegram Service for Nexik starting on port 8005")
-    web.run_app(app, port=8005)
-
 async def send_message(request):
     """Send message to Telegram chat."""
     try:
@@ -155,10 +152,10 @@ async def send_message(request):
         if not session_string or not chat_id:
             return web.json_response({'error': 'session_string and chat_id required'}, status=400)
         
-        # Расшифровываем сессию
+        # Decrypt session
         decrypted = telegram_service.decrypt_session(session_string)
         
-        # Создаём клиента и отправляем сообщение
+        # Create client and send message
         from telethon import TelegramClient
         from telethon.sessions import StringSession
         
@@ -181,5 +178,116 @@ async def send_message(request):
         logger.error(f"Send message error: {e}")
         return web.json_response({'error': str(e)}, status=500)
 
-# Добавляем маршрут
+async def get_dialogs(request):
+    """Get recent dialogs/chats for syncing."""
+    try:
+        data = await request.json()
+        session_string = data.get('session_string')
+        limit = data.get('limit', 50)
+        
+        if not session_string:
+            return web.json_response({'error': 'session_string required'}, status=400)
+        
+        decrypted = telegram_service.decrypt_session(session_string)
+        
+        from telethon import TelegramClient
+        from telethon.sessions import StringSession
+        
+        client = TelegramClient(StringSession(decrypted), API_ID, API_HASH, **TelegramService.CLIENT_PARAMS)
+        await client.connect()
+        
+        try:
+            dialogs = []
+            async for dialog in client.iter_dialogs(limit=limit):
+                dialogs.append({
+                    'id': dialog.id,
+                    'name': dialog.name,
+                    'title': dialog.title,
+                    'is_user': dialog.is_user,
+                    'is_group': dialog.is_group,
+                    'is_channel': dialog.is_channel,
+                    'unread_count': dialog.unread_count,
+                    'last_message': dialog.message.text if dialog.message else None,
+                    'last_message_date': dialog.message.date.isoformat() if dialog.message else None
+                })
+            
+            await client.disconnect()
+            return web.json_response({
+                'success': True,
+                'dialogs': dialogs
+            })
+        except Exception as e:
+            await client.disconnect()
+            return web.json_response({'error': str(e)}, status=400)
+            
+    except Exception as e:
+        logger.error(f"Get dialogs error: {e}")
+        return web.json_response({'error': str(e)}, status=500)
+
+async def get_messages(request):
+    """Get messages from a specific chat."""
+    try:
+        data = await request.json()
+        session_string = data.get('session_string')
+        chat_id = data.get('chat_id')
+        limit = data.get('limit', 50)
+        offset_id = data.get('offset_id', 0)
+        
+        if not session_string or not chat_id:
+            return web.json_response({'error': 'session_string and chat_id required'}, status=400)
+        
+        decrypted = telegram_service.decrypt_session(session_string)
+        
+        from telethon import TelegramClient
+        from telethon.sessions import StringSession
+        
+        client = TelegramClient(StringSession(decrypted), API_ID, API_HASH, **TelegramService.CLIENT_PARAMS)
+        await client.connect()
+        
+        try:
+            messages = []
+            async for msg in client.iter_messages(int(chat_id), limit=limit, offset_id=offset_id):
+                messages.append({
+                    'id': msg.id,
+                    'text': msg.text,
+                    'date': msg.date.isoformat(),
+                    'out': msg.out,
+                    'sender_id': msg.sender_id,
+                    'reply_to_msg_id': msg.reply_to_msg_id,
+                    'media_type': type(msg.media).__name__ if msg.media else None
+                })
+            
+            await client.disconnect()
+            return web.json_response({
+                'success': True,
+                'messages': messages
+            })
+        except Exception as e:
+            await client.disconnect()
+            return web.json_response({'error': str(e)}, status=400)
+            
+    except Exception as e:
+        logger.error(f"Get messages error: {e}")
+        return web.json_response({'error': str(e)}, status=500)
+
+# Create app and register routes
+app = web.Application()
+
+# Health and status
+app.router.add_get('/health', health)
+app.router.add_get('/ping', ping)
+
+# Auth routes
+app.router.add_post('/send-code', send_code)
+app.router.add_post('/sign-in', sign_in)
+app.router.add_post('/check-2fa', check_2fa)
+app.router.add_post('/decrypt', decrypt_session)
+
+# Messaging routes
 app.router.add_post('/send-message', send_message)
+app.router.add_post('/get-dialogs', get_dialogs)
+app.router.add_post('/get-messages', get_messages)
+
+if __name__ == '__main__':
+    print("Telegram Service for Nexik starting on port 8005")
+    web.run_app(app, port=8005)
