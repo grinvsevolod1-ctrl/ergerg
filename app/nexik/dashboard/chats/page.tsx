@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { 
   MessageSquare, Search, Filter, RefreshCw, Send, Bot, User, 
-  Clock, CheckCircle, AlertCircle, Loader2, ChevronRight, X,
-  Globe, Smartphone
+  Clock, CheckCircle, Loader2, X, Globe, ArrowLeft
 } from "lucide-react"
 
 interface Conversation {
@@ -48,6 +48,23 @@ interface Stats {
   unreadMessages: number
 }
 
+// Stat pill component
+function StatPill({ label, value, color }: { label: string; value: number; color: 'green' | 'yellow' | 'zinc' | 'cyan' }) {
+  const colorClasses = {
+    green: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    yellow: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+    zinc: "bg-white/5 text-white/60 border-white/10",
+    cyan: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+  }
+  
+  return (
+    <div className={`px-4 py-3 rounded-xl border ${colorClasses[color]}`}>
+      <p className="text-xl font-bold">{value}</p>
+      <p className="text-xs opacity-70">{label}</p>
+    </div>
+  )
+}
+
 export default function ChatsPage() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
@@ -56,6 +73,7 @@ export default function ChatsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [sourceFilter, setSourceFilter] = useState<string>("all")
   const [showFilters, setShowFilters] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   
   // Selected conversation
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
@@ -64,7 +82,8 @@ export default function ChatsPage() {
   const [replyText, setReplyText] = useState("")
   const [sendingReply, setSendingReply] = useState(false)
 
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true)
     try {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
@@ -82,6 +101,7 @@ export default function ChatsPage() {
       console.error("Failed to fetch conversations:", e)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [search, statusFilter, sourceFilter])
   
@@ -122,7 +142,6 @@ export default function ChatsPage() {
       
       if (res.ok) {
         setReplyText("")
-        // Refresh messages
         fetchMessages(selectedConversation.id)
       }
     } catch (e) {
@@ -138,7 +157,7 @@ export default function ChatsPage() {
     const now = new Date()
     const diff = now.getTime() - date.getTime()
     
-    if (diff < 60000) return "только что"
+    if (diff < 60000) return "сейчас"
     if (diff < 3600000) return `${Math.floor(diff / 60000)} мин`
     if (diff < 86400000) return `${Math.floor(diff / 3600000)} ч`
     if (diff < 604800000) return `${Math.floor(diff / 86400000)} д`
@@ -148,34 +167,20 @@ export default function ChatsPage() {
   
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500'
+      case 'active': return 'bg-emerald-500'
       case 'pending': return 'bg-yellow-500'
-      case 'resolved': return 'bg-zinc-500'
-      default: return 'bg-zinc-500'
+      case 'resolved': return 'bg-white/30'
+      default: return 'bg-white/30'
     }
-  }
-  
-  const getSourceIcon = (source: string) => {
-    if (source === 'telegram') {
-      return (
-        <div className="w-5 h-5 rounded bg-blue-500/20 flex items-center justify-center">
-          <svg className="w-3 h-3 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
-          </svg>
-        </div>
-      )
-    }
-    return (
-      <div className="w-5 h-5 rounded bg-cyan-500/20 flex items-center justify-center">
-        <Globe className="w-3 h-3 text-cyan-400" />
-      </div>
-    )
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-white/50" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
+          <p className="text-white/50 text-sm">Загрузка диалогов...</p>
+        </div>
       </div>
     )
   }
@@ -183,134 +188,172 @@ export default function ChatsPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-120px)]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between mb-6"
+      >
         <div>
-          <h1 className="text-2xl font-bold">Диалоги</h1>
+          <h1 className="text-2xl lg:text-3xl font-bold text-white">Диалоги</h1>
           <p className="text-white/50 text-sm mt-1">
             {stats && `${stats.active} активных из ${stats.total} всего`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => fetchConversations()}
-            className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+        <motion.button 
+          whileTap={{ scale: 0.95 }}
+          onClick={() => fetchConversations(true)}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 text-white/70 hover:text-white transition-all disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline text-sm">Обновить</span>
+        </motion.button>
+      </motion.div>
       
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-4 gap-3 mb-4">
-          <div className="bg-zinc-900 rounded-xl p-3">
-            <p className="text-white/40 text-xs">Активные</p>
-            <p className="text-xl font-semibold text-green-400">{stats.active}</p>
-          </div>
-          <div className="bg-zinc-900 rounded-xl p-3">
-            <p className="text-white/40 text-xs">Ожидают</p>
-            <p className="text-xl font-semibold text-yellow-400">{stats.pending}</p>
-          </div>
-          <div className="bg-zinc-900 rounded-xl p-3">
-            <p className="text-white/40 text-xs">Решено</p>
-            <p className="text-xl font-semibold text-white/70">{stats.resolved}</p>
-          </div>
-          <div className="bg-zinc-900 rounded-xl p-3">
-            <p className="text-white/40 text-xs">Сегодня</p>
-            <p className="text-xl font-semibold text-cyan-400">{stats.today}</p>
-          </div>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6"
+        >
+          <StatPill label="Активные" value={stats.active} color="green" />
+          <StatPill label="Ожидают" value={stats.pending} color="yellow" />
+          <StatPill label="Решено" value={stats.resolved} color="zinc" />
+          <StatPill label="Сегодня" value={stats.today} color="cyan" />
+        </motion.div>
       )}
 
       {/* Search & Filters */}
-      <div className="flex gap-2 mb-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="flex gap-2 mb-4"
+      >
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
           <input
             type="text"
             placeholder="Поиск по имени, email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-zinc-900 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/30"
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-cyan-500/50 transition-colors"
+            style={{ background: "rgba(255,255,255,0.03)" }}
           />
         </div>
         <button 
           onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${showFilters ? 'bg-cyan-500/20 text-cyan-400' : 'bg-zinc-900 text-white/70 hover:text-white'}`}
+          className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all ${
+            showFilters 
+              ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' 
+              : 'border-white/10 text-white/60 hover:text-white hover:border-white/20'
+          }`}
+          style={{ background: showFilters ? undefined : "rgba(255,255,255,0.03)" }}
         >
           <Filter className="w-4 h-4" />
-          Фильтры
+          <span className="hidden sm:inline text-sm">Фильтры</span>
         </button>
-      </div>
+      </motion.div>
       
       {/* Filters panel */}
-      {showFilters && (
-        <div className="flex gap-3 mb-4 p-3 bg-zinc-900 rounded-xl">
-          <div>
-            <label className="text-xs text-white/40 mb-1 block">Статус</label>
-            <select 
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-zinc-800 border border-white/10 rounded-lg text-white text-sm"
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden mb-4"
+          >
+            <div className="flex gap-4 p-4 rounded-xl border border-white/10"
+              style={{ background: "rgba(255,255,255,0.02)" }}
             >
-              <option value="all">Все</option>
-              <option value="active">Активные</option>
-              <option value="pending">Ожидают</option>
-              <option value="resolved">Решены</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-white/40 mb-1 block">Источник</label>
-            <select 
-              value={sourceFilter}
-              onChange={e => setSourceFilter(e.target.value)}
-              className="px-3 py-2 bg-zinc-800 border border-white/10 rounded-lg text-white text-sm"
-            >
-              <option value="all">Все</option>
-              <option value="widget">Виджет</option>
-              <option value="telegram">Telegram</option>
-            </select>
-          </div>
-        </div>
-      )}
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Статус</label>
+                <select 
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 rounded-lg border border-white/10 bg-black/30 text-white text-sm focus:outline-none focus:border-cyan-500/50"
+                >
+                  <option value="all">Все</option>
+                  <option value="active">Активные</option>
+                  <option value="pending">Ожидают</option>
+                  <option value="resolved">Решены</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-white/40 mb-1.5 block">Источник</label>
+                <select 
+                  value={sourceFilter}
+                  onChange={e => setSourceFilter(e.target.value)}
+                  className="px-3 py-2 rounded-lg border border-white/10 bg-black/30 text-white text-sm focus:outline-none focus:border-cyan-500/50"
+                >
+                  <option value="all">Все</option>
+                  <option value="widget">Виджет</option>
+                  <option value="telegram">Telegram</option>
+                </select>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main content */}
-      <div className="flex gap-4 flex-1 min-h-0">
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="flex gap-4 flex-1 min-h-0"
+      >
         {/* Conversations list */}
-        <div className="w-96 flex flex-col bg-zinc-900 rounded-xl overflow-hidden">
+        <div className={`${selectedConversation ? 'hidden lg:flex' : 'flex'} w-full lg:w-[400px] flex-col rounded-2xl border border-white/10 overflow-hidden`}
+          style={{ background: "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)" }}
+        >
           <div className="flex-1 overflow-y-auto">
             {conversations.length === 0 ? (
-              <div className="text-center py-12 px-4">
-                <MessageSquare className="w-10 h-10 mx-auto mb-3 text-white/20" />
-                <p className="text-white/50">Нет диалогов</p>
+              <div className="text-center py-16 px-4">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-8 h-8 text-white/20" />
+                </div>
+                <p className="text-white/50 font-medium">Нет диалогов</p>
                 <p className="text-sm text-white/30 mt-1">
                   Диалоги появятся когда клиенты начнут общение
                 </p>
               </div>
             ) : (
               <div className="divide-y divide-white/5">
-                {conversations.map((conv) => (
-                  <button
+                {conversations.map((conv, index) => (
+                  <motion.button
                     key={conv.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.03 }}
                     onClick={() => selectConversation(conv)}
-                    className={`w-full p-4 text-left hover:bg-white/5 transition-colors ${selectedConversation?.id === conv.id ? 'bg-white/10' : ''}`}
+                    className={`w-full p-4 text-left transition-all ${
+                      selectedConversation?.id === conv.id 
+                        ? 'bg-cyan-500/10' 
+                        : 'hover:bg-white/5'
+                    }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="relative">
-                        <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center">
-                          <span className="text-sm font-medium text-white/70">
+                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-white/10">
+                          <span className="text-sm font-medium text-white">
                             {(conv.visitorName || 'U')[0].toUpperCase()}
                           </span>
                         </div>
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-zinc-900 ${getStatusColor(conv.status)}`} />
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-zinc-900 ${getStatusColor(conv.status)}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">
+                            <span className="font-medium text-white truncate">
                               {conv.visitorName || 'Посетитель'}
                             </span>
-                            {getSourceIcon(conv.source)}
+                            {conv.source === 'telegram' && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/20 text-blue-400">TG</span>
+                            )}
                           </div>
                           <span className="text-xs text-white/40 whitespace-nowrap">
                             {formatTime(conv.lastMessageAt)}
@@ -319,19 +362,19 @@ export default function ChatsPage() {
                         <p className="text-sm text-white/50 truncate mt-0.5">
                           {conv.lastMessage || 'Нет сообщений'}
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1.5">
                           {conv.unreadCount > 0 && (
-                            <span className="px-1.5 py-0.5 bg-cyan-500 text-black text-xs font-medium rounded">
+                            <span className="px-1.5 py-0.5 bg-cyan-500 text-black text-[10px] font-bold rounded">
                               {conv.unreadCount}
                             </span>
                           )}
-                          <span className="text-xs text-white/30">
+                          <span className="text-[10px] text-white/30">
                             {conv.messagesCount} сообщ.
                           </span>
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             )}
@@ -339,54 +382,62 @@ export default function ChatsPage() {
         </div>
 
         {/* Chat view */}
-        <div className="flex-1 flex flex-col bg-zinc-900 rounded-xl overflow-hidden">
+        <div className={`${selectedConversation ? 'flex' : 'hidden lg:flex'} flex-1 flex-col rounded-2xl border border-white/10 overflow-hidden`}
+          style={{ background: "linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)" }}
+        >
           {!selectedConversation ? (
             <div className="flex-1 flex items-center justify-center text-center p-8">
               <div>
-                <MessageSquare className="w-12 h-12 mx-auto mb-4 text-white/20" />
-                <p className="text-white/50">Выберите диалог</p>
+                <div className="w-20 h-20 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-10 h-10 text-white/20" />
+                </div>
+                <p className="text-white/50 font-medium">Выберите диалог</p>
                 <p className="text-sm text-white/30 mt-1">
-                  Выберите диалог слева для просмотра истории сообщений
+                  Выберите диалог слева для просмотра истории
                 </p>
               </div>
             </div>
           ) : (
             <>
               {/* Chat header */}
-              <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <div className="flex items-center justify-between p-4 border-b border-white/10"
+                style={{ background: "rgba(255,255,255,0.02)" }}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center">
+                  <button
+                    onClick={() => setSelectedConversation(null)}
+                    className="lg:hidden p-2 -ml-2 hover:bg-white/10 rounded-lg"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center border border-white/10">
                     <span className="text-sm font-medium">
                       {(selectedConversation.visitorName || 'U')[0].toUpperCase()}
                     </span>
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">
+                      <span className="font-medium text-white">
                         {selectedConversation.visitorName || 'Посетитель'}
                       </span>
-                      {getSourceIcon(selectedConversation.source)}
+                      {selectedConversation.source === 'telegram' && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/20 text-blue-400">TG</span>
+                      )}
                     </div>
-                    <p className="text-sm text-white/40">
+                    <p className="text-xs text-white/40">
                       {selectedConversation.visitorEmail || selectedConversation.visitorId}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className={`px-2 py-1 rounded text-xs font-medium ${
-                    selectedConversation.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                  <div className={`px-2.5 py-1 rounded-lg text-xs font-medium ${
+                    selectedConversation.status === 'active' ? 'bg-emerald-500/20 text-emerald-400' :
                     selectedConversation.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                    'bg-zinc-700 text-white/60'
+                    'bg-white/10 text-white/60'
                   }`}>
                     {selectedConversation.status === 'active' ? 'Активен' :
                      selectedConversation.status === 'pending' ? 'Ожидает' : 'Решён'}
                   </div>
-                  <button 
-                    onClick={() => setSelectedConversation(null)}
-                    className="p-2 hover:bg-white/10 rounded-lg lg:hidden"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
 
@@ -394,46 +445,52 @@ export default function ChatsPage() {
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {loadingMessages ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+                    <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="text-center py-8 text-white/40">
                     Нет сообщений
                   </div>
                 ) : (
-                  messages.map((msg) => (
-                    <div 
+                  messages.map((msg, index) => (
+                    <motion.div 
                       key={msg.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.02 }}
                       className={`flex ${msg.senderType === 'visitor' ? 'justify-start' : 'justify-end'}`}
                     >
-                      <div className={`max-w-[70%] ${
+                      <div className={`max-w-[75%] rounded-2xl px-4 py-3 ${
                         msg.senderType === 'visitor' 
-                          ? 'bg-zinc-800' 
+                          ? 'bg-white/5 border border-white/10 rounded-bl-sm' 
                           : msg.senderType === 'ai'
-                          ? 'bg-cyan-500/20'
-                          : 'bg-blue-500/20'
-                      } rounded-2xl px-4 py-2.5`}>
+                          ? 'bg-gradient-to-br from-cyan-500/20 to-cyan-500/10 border border-cyan-500/20 rounded-br-sm'
+                          : 'bg-gradient-to-br from-purple-500/20 to-purple-500/10 border border-purple-500/20 rounded-br-sm'
+                      }`}>
                         <div className="flex items-center gap-2 mb-1">
-                          {msg.senderType === 'ai' && <Bot className="w-3 h-3 text-cyan-400" />}
-                          {msg.senderType === 'visitor' && <User className="w-3 h-3 text-white/40" />}
-                          <span className="text-xs text-white/40">
-                            {msg.senderType === 'ai' ? 'AI' : 
+                          {msg.senderType === 'ai' && <Bot className="w-3.5 h-3.5 text-cyan-400" />}
+                          {msg.senderType === 'visitor' && <User className="w-3.5 h-3.5 text-white/40" />}
+                          {msg.senderType === 'operator' && <CheckCircle className="w-3.5 h-3.5 text-purple-400" />}
+                          <span className="text-xs text-white/50">
+                            {msg.senderType === 'ai' ? 'Nexik AI' : 
                              msg.senderType === 'visitor' ? 'Посетитель' : 
                              msg.senderName || 'Оператор'}
                           </span>
-                          <span className="text-xs text-white/30">
+                          <span className="text-[10px] text-white/30">
                             {new Date(msg.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <p className="text-white whitespace-pre-wrap">{msg.content}</p>
+                        <p className="text-white/90 whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
                       </div>
-                    </div>
+                    </motion.div>
                   ))
                 )}
               </div>
 
               {/* Reply input */}
-              <div className="p-4 border-t border-white/10">
+              <div className="p-4 border-t border-white/10"
+                style={{ background: "rgba(255,255,255,0.02)" }}
+              >
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -441,12 +498,12 @@ export default function ChatsPage() {
                     onChange={(e) => setReplyText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendReply()}
                     placeholder="Написать ответ..."
-                    className="flex-1 px-4 py-2.5 bg-zinc-800 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/30"
+                    className="flex-1 px-4 py-3 rounded-xl border border-white/10 bg-black/20 text-white placeholder:text-white/30 focus:outline-none focus:border-cyan-500/50 transition-colors"
                   />
                   <button
                     onClick={sendReply}
                     disabled={sendingReply || !replyText.trim()}
-                    className="px-4 py-2.5 bg-cyan-500 text-black rounded-xl font-medium hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-5 py-3 bg-gradient-to-r from-cyan-500 to-cyan-400 text-black rounded-xl font-medium hover:from-cyan-400 hover:to-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {sendingReply ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -456,7 +513,8 @@ export default function ChatsPage() {
                   </button>
                 </div>
                 {selectedConversation.source === 'telegram' && (
-                  <p className="text-xs text-white/30 mt-2">
+                  <p className="text-[11px] text-white/30 mt-2 flex items-center gap-1">
+                    <Globe className="w-3 h-3" />
                     Ответ будет отправлен в Telegram
                   </p>
                 )}
@@ -464,7 +522,7 @@ export default function ChatsPage() {
             </>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }
