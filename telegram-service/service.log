@@ -66,3 +66,16 @@ INFO:__main__:Signing in with code for +18166806339
 INFO:telethon.network.mtprotosender:Disconnecting from 149.154.175.60:443/TcpFull...
 INFO:telethon.network.mtprotosender:Disconnection from 149.154.175.60:443/TcpFull complete!
 INFO:aiohttp.access:127.0.0.1 [24/May/2026:17:18:55 +0000] "POST /sign-in HTTP/1.1" 200 766 "-" "node"
+INFO:aiohttp.access:205.210.31.222 [24/May/2026:20:02:21 +0000] "GET / HTTP/1.1" 404 173 "-" "Hello from Palo Alto Networks, find out more about our scans in https://docs-cortex.paloaltonetworks.com/r/1/Cortex-Xpanse/Scanning-activity"
+ERROR:aiohttp.server:Error handling request
+Traceback (most recent call last):
+  File "/var/www/netnext-new/telegram-service/venv/lib/python3.12/site-packages/aiohttp/web_protocol.py", line 350, in data_received
+    messages, upgraded, tail = self._request_parser.feed_data(data)
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "aiohttp/_http_parser.pyx", line 557, in aiohttp._http_parser.HttpParser.feed_data
+aiohttp.http_exceptions.BadStatusLine: 400, message:
+  Invalid method encountered:
+
+    b'MGLNDD_144.31.236.111_8005\n'
+       ^
+INFO:aiohttp.access:135.237.121.153 [25/May/2026:03:26:43 +0000] "UNKNOWN / HTTP/1.0" 400 230 "-" "-"
