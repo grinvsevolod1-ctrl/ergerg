@@ -244,6 +244,7 @@ export async function routedChat(
     temperature?: number
     maxTokens?: number
     preferServer?: string
+    timeout?: number // Custom timeout override
   }
 ) {
   // Select server (prefer specified if healthy)
@@ -261,8 +262,12 @@ export async function routedChat(
     serverHealth[server].activeRequests++
   }
   
+  // Use custom timeout if provided, otherwise use config timeout
+  // Minimum 30 seconds for complex requests
+  const timeout = options?.timeout || Math.max(config.timeout, 60000)
+  
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), config.timeout)
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
     const start = Date.now()

@@ -260,7 +260,8 @@ export async function POST(request: NextRequest) {
         model: AI_SERVERS.fast.defaultModel,
         system: systemPrompt,
         temperature: 0.7,
-        maxTokens: MAX_TOKENS_RESPONSE
+        maxTokens: MAX_TOKENS_RESPONSE,
+        timeout: 120000 // 2 minutes for training - complex prompts need more time
       }
     )
     
