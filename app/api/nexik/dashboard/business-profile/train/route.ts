@@ -250,6 +250,9 @@ export async function POST(request: NextRequest) {
   
   let aiResult
   try {
+    console.log('[Nexik Train] Calling AI with message length:', message.length)
+    console.log('[Nexik Train] AI Server config:', AI_SERVERS.fast?.url, AI_SERVERS.fast?.defaultModel)
+    
     aiResult = await routedChat(
       'simple',
       [...historyForAI, { role: 'user', content: message.substring(0, MAX_MESSAGE_LENGTH) }],
@@ -260,12 +263,37 @@ export async function POST(request: NextRequest) {
         maxTokens: MAX_TOKENS_RESPONSE
       }
     )
+    
+    console.log('[Nexik Train] AI response received, length:', aiResult?.response?.length || 0)
   } catch (error) {
-    console.error('[v0] Train API error:', error)
+    console.error('[Nexik Train] AI Error:', error)
+    
+    // Детальное сообщение об ошибке
+    let errorMessage = 'AI временно недоступен. '
+    let errorDetails = ''
+    
+    if (error instanceof Error) {
+      errorDetails = error.message
+      
+      if (error.message.includes('abort') || error.message.includes('timeout')) {
+        errorMessage += 'Превышено время ожидания ответа. Попробуйте отправить более короткое сообщение.'
+      } else if (error.message.includes('ECONNREFUSED') || error.message.includes('fetch failed')) {
+        errorMessage += 'Не удалось подключиться к AI серверу. Проверьте что Ollama запущен.'
+      } else if (error.message.includes('HTTP')) {
+        errorMessage += `Ошибка сервера: ${error.message}`
+      } else {
+        errorMessage += 'Попробуйте еще раз через несколько секунд.'
+      }
+    } else {
+      errorMessage += 'Неизвестная ошибка. Попробуйте еще раз.'
+    }
+    
     return NextResponse.json({ 
-      error: 'AI временно недоступен. Попробуйте еще раз.',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+      error: errorMessage,
+      details: errorDetails,
+      code: 'AI_ERROR',
+      serverUrl: AI_SERVERS.fast?.url || 'not configured'
+    }, { status: 503 })
   }
   
   if (!aiResult?.response) {
