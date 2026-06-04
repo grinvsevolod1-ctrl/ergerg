@@ -201,7 +201,7 @@ export const responses: Record<string, ResponseData> = {
 
   // -- SEO --
   seo: {
-    text: "SEO-о��тимизация входит в каждый проект:\n\n- Семантическая HTML-разметка\n- Core Web Vitals оптимизация\n- Мета-теги и Open Graph\n- Структурированные данные (Schema.org)\n- Sitemap и robots.txt\n- Оптимизация изображений\n- SSR/SSG для максимальной скорости\n\nНаши сайты получают 90+ баллов в Lighthouse.",
+    text: "SEO-оптимизация входит в каждый проект:\n\n- Семантическая HTML-разметка\n- Core Web Vitals оптимизация\n- Мета-теги и Open Graph\n- Структурированные данные (Schema.org)\n- Sitemap и robots.txt\n- Оптимизация изображений\n- SSR/SSG для максимальной скорости\n\nНаши сайты получают 90+ баллов в Lighthouse.",
     buttons: [
       { label: "Технологии", action: "tech" },
       { label: "Заказать сайт", action: "start_project" },

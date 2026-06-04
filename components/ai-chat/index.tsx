@@ -234,7 +234,7 @@ export function AIChat({ isOpen, onClose, onNavigate }: AIChatProps) {
       const operatorMsg: Message = {
         id: `a_${Date.now()}`,
         role: "assistant",
-        content: "Подключаю живо��о оператора. Обычно отвечаем в течение нескольких минут.\n\nПока ждёте, можете описать свой вопрос — оператор увидит всю переписку.",
+        content: "Подключаю живого оператора. Обычно отвечаем в течение нескольких минут.\n\nПока ждёте, можете описать свой вопрос — оператор увидит всю переписку.",
         timestamp: new Date(),
       }
       setMessages(prev => [...prev, operatorMsg])

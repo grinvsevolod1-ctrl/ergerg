@@ -325,7 +325,7 @@ export function SidebarNav({ activeSection, onNavigate }: SidebarNavProps) {
                 
                 {/* Header */}
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-lg font-semibold">Связатьс�� с нами</h3>
+                  <h3 className="text-lg font-semibold">Связаться с нами</h3>
                   <button
                     onClick={() => setIsMobileContactOpen(false)}
                     className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center"
