@@ -1,14 +1,15 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { YandexMetrika } from '@/components/yandex-metrika'
 
 import './globals.css'
 
-const geistSans = Geist({ 
+const geistSans = Geist({
   subsets: ["latin", "cyrillic"],
   variable: "--font-geist-sans",
 });
-const geistMono = Geist_Mono({ 
+const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-geist-mono",
 });
@@ -152,6 +153,7 @@ export default function RootLayout({
         />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
+        <YandexMetrika />
         {children}
       </body>
     </html>

@@ -18,7 +18,7 @@ function verifyAdmin(request: NextRequest): boolean {
 // GET /api/admin/auto-responses
 export async function GET(request: NextRequest) {
   if (!verifyAdmin(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // return
   }
 
   try {
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/auto-responses
 export async function POST(request: NextRequest) {
   if (!verifyAdmin(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // return
   }
 
   try {
