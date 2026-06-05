@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { CookieConsent } from "@/components/cookie-consent"
 import { HeroSection } from "@/components/sections/hero-section"
+import { LandingPromo } from "@/components/sections/landing-promo"
 import { PromotionSection } from "@/components/sections/promotion-section"
 import { ServicesSection } from "@/components/sections/services-section"
 import { ProcessSection } from "@/components/sections/process-section"
@@ -105,6 +106,7 @@ export default function Home() {
         {showContent && (
             <div className="md:pl-[72px] pt-14 md:pt-0 pb-24 md:pb-0">
             <HeroSection onNavigate={handleNavigate} />
+            <LandingPromo onOpenChat={() => setIsChatOpen(true)} />
             <PromotionSection onNavigate={handleNavigate} />
             <ServicesSection />
             <ProcessSection />
