@@ -6,7 +6,7 @@ import { TelegramIcon, WhatsAppIcon, ViberIcon, InstagramIcon, LinkedInIcon } fr
 
 const footerLinks = {
   company: [
-    { label: "О нас", href: "#about" },
+    { label: "О нас", href: "#team" },
     { label: "Услуги", href: "#services" },
     { label: "Проекты", href: "#portfolio" },
     { label: "Команда", href: "#team" },
