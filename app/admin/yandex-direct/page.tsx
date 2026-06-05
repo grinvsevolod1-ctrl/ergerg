@@ -22,6 +22,16 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/admin/page-header"
 import { StatsCard } from "@/components/admin/stats-card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Campaign {
   Id: number
@@ -93,6 +103,7 @@ export default function YandexDirectPage() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
   const [showCreate, setShowCreate] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -125,7 +136,6 @@ export default function YandexDirectPage() {
     id: number,
     action: "suspend" | "resume" | "archive" | "unarchive" | "delete"
   ) => {
-    if (action === "delete" && !window.confirm("Удалить кампанию безвозвратно?")) return
     setBusyId(id)
     try {
       const res = await fetch(`/api/admin/yandex-direct/${id}`, {
@@ -320,7 +330,7 @@ export default function YandexDirectPage() {
                                   <Archive className="w-4 h-4" />
                                 </ActionBtn>
                               )}
-                              <ActionBtn title="Удалить" onClick={() => runAction(c.Id, "delete")} accent="red">
+                              <ActionBtn title="Удалить" onClick={() => setConfirmDeleteId(c.Id)} accent="red">
                                 <Trash2 className="w-4 h-4" />
                               </ActionBtn>
                             </>
@@ -388,6 +398,31 @@ export default function YandexDirectPage() {
           }}
         />
       )}
+
+      <AlertDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => !open && setConfirmDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить кампанию?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Кампания будет удалена в Яндекс Директе безвозвратно. Это действие нельзя отменить.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmDeleteId !== null) runAction(confirmDeleteId, "delete")
+                setConfirmDeleteId(null)
+              }}
+            >
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -1,17 +1,42 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft, Building2, MapPin, Mail, FileText, Phone, Calendar, Briefcase, Hash } from "lucide-react"
 
-export const metadata = {
-  title: "Условия использования | NetNext",
+export const metadata: Metadata = {
+  title: "Условия использования",
   description: "Условия использования и информация о компании ООО НетНекст. УНП 193962237.",
   alternates: {
     canonical: "https://netnext.site/terms",
   },
+  openGraph: {
+    title: "Условия использования | NetNext",
+    description: "Условия использования сайта и реквизиты компании ООО НетНекст.",
+    url: "https://netnext.site/terms",
+    type: "article",
+  },
+}
+
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Главная", item: "https://netnext.site" },
+    {
+      "@type": "ListItem",
+      position: 2,
+      name: "Условия использования",
+      item: "https://netnext.site/terms",
+    },
+  ],
 }
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       {/* Header */}
       <header className="border-b border-border/50 bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 md:px-6 py-4 flex items-center gap-4">

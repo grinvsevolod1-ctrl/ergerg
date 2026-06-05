@@ -28,6 +28,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/admin/page-header"
 import { StatsCard } from "@/components/admin/stats-card"
+import { EmptyState } from "@/components/admin/empty-state"
+import { adminFetch, reportAdminError } from "@/lib/admin-fetch"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface AutoResponseRule {
   id: string
@@ -69,41 +81,30 @@ export default function AutoResponsesPage() {
   const [showNewRule, setShowNewRule] = useState(false)
   const [showNewTemplate, setShowNewTemplate] = useState(false)
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set())
+  // Track in-flight row actions to disable buttons and prevent double-submits.
+  const [busyId, setBusyId] = useState<string | null>(null)
+  // Controlled confirmation dialog (replaces window.confirm).
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean
+    title: string
+    description: string
+    onConfirm: (() => void) | null
+  }>({ open: false, title: "", description: "", onConfirm: null })
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [rulesResponse, templatesResponse] = await Promise.all([
-        fetch('/api/admin/auto-responses?type=rules', {
-          credentials: 'include',
-        }),
-        fetch('/api/admin/auto-responses?type=quick-replies', {
-          credentials: 'include',
-        }),
+      const [rulesData, templatesData] = await Promise.all([
+        adminFetch<{ rules?: AutoResponseRule[] }>('/api/admin/auto-responses?type=rules'),
+        adminFetch<{ templates?: QuickReplyTemplate[]; categories?: string[] }>(
+          '/api/admin/auto-responses?type=quick-replies',
+        ),
       ])
-
-      if (rulesResponse.status === 401 || templatesResponse.status === 401) {
-        toast.error("Сессия истекла. Войдите снова.")
-        return
-      }
-
-      if (rulesResponse.ok) {
-        const data = await rulesResponse.json()
-        setRules(data.rules || [])
-      }
-
-      if (templatesResponse.ok) {
-        const data = await templatesResponse.json()
-        setTemplates(data.templates || [])
-        setCategories(data.categories || [])
-      }
-
-      if (!rulesResponse.ok && !templatesResponse.ok) {
-        toast.error("Не удалось загрузить данные автоответов")
-      }
+      setRules(rulesData?.rules || [])
+      setTemplates(templatesData?.templates || [])
+      setCategories(templatesData?.categories || [])
     } catch (error) {
-      console.error('Error fetching data:', error)
-      toast.error("Ошибка соединения с сервером")
+      reportAdminError(error, "Не удалось загрузить данные автоответов")
     } finally {
       setLoading(false)
     }
@@ -114,120 +115,108 @@ export default function AutoResponsesPage() {
   }, [fetchData])
 
   const toggleRule = async (rule: AutoResponseRule) => {
+    if (busyId) return
+    setBusyId(rule.id)
     try {
-      const res = await fetch(`/api/admin/auto-responses/${rule.id}`, {
+      await adminFetch(`/api/admin/auto-responses/${rule.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ enabled: !rule.enabled }),
       })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || `HTTP ${res.status}`)
-      }
       setRules(rules.map(r => r.id === rule.id ? { ...r, enabled: !r.enabled } : r))
       toast.success(rule.enabled ? "Правило отключено" : "Правило включено")
     } catch (error) {
-      console.error('Error toggling rule:', error)
-      toast.error(error instanceof Error ? error.message : "Не удалось изменить правило")
+      reportAdminError(error, "Не удалось изменить правило")
+    } finally {
+      setBusyId(null)
     }
   }
 
-  const deleteRule = async (id: string) => {
-    if (!confirm('Удалить правило?')) return
-
+  const performDeleteRule = async (id: string) => {
+    setBusyId(id)
     try {
-      const res = await fetch(`/api/admin/auto-responses/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || `HTTP ${res.status}`)
-      }
+      await adminFetch(`/api/admin/auto-responses/${id}`, { method: 'DELETE' })
       setRules(rules.filter(r => r.id !== id))
       toast.success("Правило удалено")
     } catch (error) {
-      console.error('Error deleting rule:', error)
-      toast.error(error instanceof Error ? error.message : "Не удалось удалить правило")
+      reportAdminError(error, "Не удалось удалить правило")
+    } finally {
+      setBusyId(null)
     }
   }
 
-  const deleteTemplate = async (id: string) => {
-    if (!confirm('Удалить шаблон?')) return
+  const deleteRule = (id: string) => {
+    setConfirmState({
+      open: true,
+      title: "Удалить правило?",
+      description: "Правило автоответа будет удалено без возможности восстановления.",
+      onConfirm: () => performDeleteRule(id),
+    })
+  }
 
+  const performDeleteTemplate = async (id: string) => {
+    setBusyId(id)
     try {
-      const res = await fetch(`/api/admin/auto-responses/${id}?type=quick-reply`, {
-        method: 'DELETE',
-        credentials: 'include',
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || `HTTP ${res.status}`)
-      }
+      await adminFetch(`/api/admin/auto-responses/${id}?type=quick-reply`, { method: 'DELETE' })
       setTemplates(templates.filter(t => t.id !== id))
       toast.success("Шаблон удалён")
     } catch (error) {
-      console.error('Error deleting template:', error)
-      toast.error(error instanceof Error ? error.message : "Не удалось удалить шаблон")
+      reportAdminError(error, "Не удалось удалить шаблон")
+    } finally {
+      setBusyId(null)
     }
   }
 
-  const saveRule = async (rule: Partial<AutoResponseRule>) => {
+  const deleteTemplate = (id: string) => {
+    setConfirmState({
+      open: true,
+      title: "Удалить шаблон?",
+      description: "Шаблон быстрого ответа будет удалён без возможности восстановления.",
+      onConfirm: () => performDeleteTemplate(id),
+    })
+  }
+
+  const saveRule = async (rule: Partial<AutoResponseRule>): Promise<boolean> => {
     try {
-      const res = editingRule
-        ? await fetch(`/api/admin/auto-responses/${editingRule.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(rule),
-          })
-        : await fetch('/api/admin/auto-responses', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(rule),
-          })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || `HTTP ${res.status}`)
-      }
+      await adminFetch(
+        editingRule ? `/api/admin/auto-responses/${editingRule.id}` : '/api/admin/auto-responses',
+        {
+          method: editingRule ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rule),
+        },
+      )
       toast.success(editingRule ? "Правило обновлено" : "Правило создано")
       setEditingRule(null)
       setShowNewRule(false)
       fetchData()
+      return true
     } catch (error) {
-      console.error('Error saving rule:', error)
-      toast.error(error instanceof Error ? error.message : "Не удалось сохранить правило")
+      reportAdminError(error, "Не удалось сохранить правило")
+      return false
     }
   }
 
-  const saveTemplate = async (template: Partial<QuickReplyTemplate>) => {
+  const saveTemplate = async (template: Partial<QuickReplyTemplate>): Promise<boolean> => {
     try {
-      const res = editingTemplate
-        ? await fetch(`/api/admin/auto-responses/${editingTemplate.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ ...template, type: 'quick-reply' }),
-          })
-        : await fetch('/api/admin/auto-responses', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ ...template, type: 'quick-reply' }),
-          })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || `HTTP ${res.status}`)
-      }
+      await adminFetch(
+        editingTemplate
+          ? `/api/admin/auto-responses/${editingTemplate.id}`
+          : '/api/admin/auto-responses',
+        {
+          method: editingTemplate ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...template, type: 'quick-reply' }),
+        },
+      )
       toast.success(editingTemplate ? "Шаблон обновлён" : "Шаблон создан")
       setEditingTemplate(null)
       setShowNewTemplate(false)
       fetchData()
+      return true
     } catch (error) {
-      console.error('Error saving template:', error)
-      toast.error(error instanceof Error ? error.message : "Не удалось сохранить шаблон")
+      reportAdminError(error, "Не удалось сохранить шаблон")
+      return false
     }
   }
 
@@ -299,11 +288,13 @@ export default function AutoResponsesPage() {
 
           <div className="space-y-3">
             {rules.length === 0 && !loading ? (
-              <div className="flex flex-col items-center justify-center h-48 bg-[#0a0a0a]/50 border border-[#1a1a1a] rounded-xl">
-                <MessageSquare className="w-10 h-10 text-[#555] mb-3" />
-                <p className="text-white font-medium">Нет правил</p>
-                <p className="text-sm text-[#888]">Добавьте первое правило автоответа</p>
-              </div>
+              <EmptyState
+                icon={MessageSquare}
+                title="Нет правил"
+                description="Добавьте первое правило автоответа, чтобы бот отвечал автоматически."
+                actionLabel="Добавить правило"
+                onAction={() => setShowNewRule(true)}
+              />
             ) : (
               rules.map((rule) => {
                 const triggerConfig = triggerTypeConfig[rule.trigger_type]
@@ -353,8 +344,9 @@ export default function AutoResponsesPage() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleRule(rule) }}
+                          disabled={busyId === rule.id}
                           className={cn(
-                            "p-2.5 rounded-xl transition-colors",
+                            "p-2.5 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
                             rule.enabled 
                               ? "text-emerald-400 hover:bg-emerald-500/10" 
                               : "text-[#555] hover:bg-[#222]"
@@ -364,13 +356,15 @@ export default function AutoResponsesPage() {
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); setEditingRule(rule) }}
-                          className="p-2.5 rounded-xl text-[#888] hover:text-white hover:bg-[#222]"
+                          disabled={busyId === rule.id}
+                          className="p-2.5 rounded-xl text-[#888] hover:text-white hover:bg-[#222] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); deleteRule(rule.id) }}
-                          className="p-2.5 rounded-xl text-[#888] hover:text-red-400 hover:bg-red-500/10"
+                          disabled={busyId === rule.id}
+                          className="p-2.5 rounded-xl text-[#888] hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -456,11 +450,13 @@ export default function AutoResponsesPage() {
           )}
 
           {templates.length === 0 && !loading ? (
-            <div className="flex flex-col items-center justify-center h-48 bg-[#0a0a0a]/50 border border-[#1a1a1a] rounded-xl">
-              <MessageSquare className="w-10 h-10 text-[#555] mb-3" />
-              <p className="text-white font-medium">Нет шаблонов</p>
-              <p className="text-sm text-[#888]">Добавьте быстрые ответы для операторов</p>
-            </div>
+            <EmptyState
+              icon={MessageSquare}
+              title="Нет шаблонов"
+              description="Добавьте быстрые ответы, чтобы операторы отвечали в один клик."
+              actionLabel="Добавить шаблон"
+              onAction={() => setShowNewTemplate(true)}
+            />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {templates.map((template) => (
@@ -485,13 +481,15 @@ export default function AutoResponsesPage() {
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => setEditingTemplate(template)}
-                        className="p-2 rounded-lg text-[#888] hover:text-white hover:bg-[#222]"
+                        disabled={busyId === template.id}
+                        className="p-2 rounded-lg text-[#888] hover:text-white hover:bg-[#222] disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteTemplate(template.id)}
-                        className="p-2 rounded-lg text-[#888] hover:text-red-400 hover:bg-red-500/10"
+                        disabled={busyId === template.id}
+                        className="p-2 rounded-lg text-[#888] hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -507,6 +505,29 @@ export default function AutoResponsesPage() {
           )}
         </div>
       )}
+
+      <AlertDialog
+        open={confirmState.open}
+        onOpenChange={(open) => setConfirmState((s) => ({ ...s, open }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmState.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmState.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                confirmState.onConfirm?.()
+                setConfirmState((s) => ({ ...s, open: false, onConfirm: null }))
+              }}
+            >
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -517,7 +538,7 @@ function RuleForm({
   onCancel,
 }: {
   rule: AutoResponseRule | null
-  onSave: (rule: Partial<AutoResponseRule>) => void
+  onSave: (rule: Partial<AutoResponseRule>) => Promise<boolean>
   onCancel: () => void
 }) {
   const [form, setForm] = useState({
@@ -529,18 +550,50 @@ function RuleForm({
     priority: rule?.priority || 0,
     enabled: rule?.enabled !== false,
   })
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({
-      name: form.name,
+    if (isSaving) return
+
+    // Client-side validation before hitting the server.
+    if (!form.name.trim()) {
+      toast.error("Укажите название правила")
+      return
+    }
+    if (!form.response_text.trim()) {
+      toast.error("Укажите текст ответа бота")
+      return
+    }
+    const keywords = form.trigger_keywords.split(',').map(k => k.trim()).filter(Boolean)
+    if (form.trigger_type === 'keywords' && keywords.length === 0) {
+      toast.error("Добавьте хотя бы одно ключевое слово")
+      return
+    }
+    if (form.trigger_type === 'pattern') {
+      if (!form.trigger_pattern.trim()) {
+        toast.error("Укажите регулярное выражение")
+        return
+      }
+      try {
+        new RegExp(form.trigger_pattern)
+      } catch {
+        toast.error("Некорректное регулярное выражение")
+        return
+      }
+    }
+
+    setIsSaving(true)
+    await onSave({
+      name: form.name.trim(),
       trigger_type: form.trigger_type,
-      trigger_keywords: form.trigger_keywords.split(',').map(k => k.trim()).filter(Boolean),
+      trigger_keywords: keywords,
       trigger_pattern: form.trigger_pattern,
-      response_text: form.response_text,
+      response_text: form.response_text.trim(),
       priority: form.priority,
       enabled: form.enabled,
     })
+    setIsSaving(false)
   }
 
   return (
@@ -632,12 +685,16 @@ function RuleForm({
       </div>
 
       <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="ghost" onClick={onCancel} className="text-[#888]">
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={isSaving} className="text-[#888]">
           Отмена
         </Button>
-        <Button type="submit">
-          <Save className="w-4 h-4 mr-2" />
-          {rule ? 'Сохранить' : 'Создать'}
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4 mr-2" />
+          )}
+          {isSaving ? 'Сохранение…' : rule ? 'Сохранить' : 'Создать'}
         </Button>
       </div>
     </form>
@@ -652,7 +709,7 @@ function TemplateForm({
 }: {
   template: QuickReplyTemplate | null
   categories: string[]
-  onSave: (template: Partial<QuickReplyTemplate>) => void
+  onSave: (template: Partial<QuickReplyTemplate>) => Promise<boolean>
   onCancel: () => void
 }) {
   const [form, setForm] = useState({
@@ -661,10 +718,29 @@ function TemplateForm({
     content: template?.content || '',
     shortcut: template?.shortcut || '',
   })
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSave(form)
+    if (isSaving) return
+
+    if (!form.title.trim()) {
+      toast.error("Укажите название шаблона")
+      return
+    }
+    if (!form.content.trim()) {
+      toast.error("Укажите текст шаблона")
+      return
+    }
+
+    setIsSaving(true)
+    await onSave({
+      category: form.category.trim() || 'Общие',
+      title: form.title.trim(),
+      content: form.content.trim(),
+      shortcut: form.shortcut.trim(),
+    })
+    setIsSaving(false)
   }
 
   return (
@@ -719,12 +795,16 @@ function TemplateForm({
       </div>
 
       <div className="flex justify-end gap-3 pt-2">
-        <Button type="button" variant="ghost" onClick={onCancel} className="text-[#888]">
+        <Button type="button" variant="ghost" onClick={onCancel} disabled={isSaving} className="text-[#888]">
           Отмена
         </Button>
-        <Button type="submit">
-          <Save className="w-4 h-4 mr-2" />
-          {template ? 'Сохранить' : 'Создать'}
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4 mr-2" />
+          )}
+          {isSaving ? 'Сохранение…' : template ? 'Сохранить' : 'Создать'}
         </Button>
       </div>
     </form>

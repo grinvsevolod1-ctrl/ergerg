@@ -1,22 +1,38 @@
 import type { MetadataRoute } from 'next'
 
+// Private / utility routes that must never be indexed. The public Nexik landing
+// (/nexik) and demo (/nexik/demo) stay crawlable; auth and dashboard pages do not.
+const privatePaths = [
+  '/api/',
+  '/admin/',
+  '/unsubscribe',
+  '/nexik/dashboard',
+  '/nexik/login',
+  '/nexik/register',
+  '/nexik/forgot-password',
+  '/nexik/reset-password',
+  '/nexik/connect',
+  '/nexik/app',
+  '/nexik/start',
+]
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/admin/', '/unsubscribe', '/_next/', '/static/'],
+        disallow: [...privatePaths, '/_next/', '/static/'],
       },
       {
         userAgent: 'Googlebot',
         allow: '/',
-        disallow: ['/api/', '/admin/', '/unsubscribe'],
+        disallow: privatePaths,
       },
       {
         userAgent: 'Yandexbot',
         allow: '/',
-        disallow: ['/api/', '/admin/', '/unsubscribe'],
+        disallow: privatePaths,
       },
     ],
     sitemap: 'https://netnext.site/sitemap.xml',

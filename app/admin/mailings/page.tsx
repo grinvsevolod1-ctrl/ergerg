@@ -33,6 +33,16 @@ import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/admin/page-header"
 import { StatsCard } from "@/components/admin/stats-card"
 import { EmailEditor } from "@/components/admin/email-editor"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface Campaign {
   id: string
@@ -56,6 +66,7 @@ export default function MailingsPage() {
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [activeMenu, setActiveMenu] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true)
@@ -63,10 +74,19 @@ export default function MailingsPage() {
       const res = await fetch("/api/admin/mailings", {
         credentials: 'include',
       })
+      if (res.status === 401) {
+        toast.error("Сессия истекла. Войдите снова.")
+        return
+      }
+      if (!res.ok) {
+        toast.error("Не удалось загрузить рассылки")
+        return
+      }
       const data = await res.json()
       setCampaigns(data.campaigns || [])
     } catch (err) {
       console.error("Failed to fetch campaigns:", err)
+      toast.error("Ошибка соединения с сервером")
     } finally {
       setLoading(false)
     }
@@ -86,8 +106,13 @@ export default function MailingsPage() {
         body: JSON.stringify({ action, campaignId, ...extraData }),
       })
 
+      if (res.status === 401) {
+        toast.error("Сессия истекла. Войдите снова.")
+        return null
+      }
+
       if (!res.ok) {
-        const data = await res.json()
+        const data = await res.json().catch(() => ({}))
         toast.error(data.error || "Действие не выполнено")
         return null
       }
@@ -97,11 +122,22 @@ export default function MailingsPage() {
       return data
     } catch (err) {
       console.error("Action failed:", err)
+      toast.error("Ошибка соединения с сервером")
       return null
     } finally {
       setActionLoading(null)
       setActiveMenu(null)
     }
+  }
+
+  // Intercept card actions so destructive delete goes through a confirm dialog.
+  const handleCardAction = async (action: string, campaignId?: string) => {
+    if (action === "delete" && campaignId) {
+      setActiveMenu(null)
+      setConfirmDeleteId(campaignId)
+      return null
+    }
+    return performAction(action, campaignId)
   }
 
   const loadCampaignDetails = async (campaignId: string) => {
@@ -193,7 +229,7 @@ export default function MailingsPage() {
               <CampaignRow
                 key={campaign.id}
                 campaign={campaign}
-                onAction={performAction}
+                onAction={handleCardAction}
                 onAddRecipients={() => setShowRecipientsModal(campaign.id)}
                 onEdit={() => loadCampaignDetails(campaign.id)}
                 actionLoading={actionLoading}
@@ -236,6 +272,31 @@ export default function MailingsPage() {
           }}
         />
       )}
+
+      <AlertDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => !open && setConfirmDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить рассылку?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Рассылка и связанные с ней данные будут удалены без возможности восстановления.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmDeleteId) performAction("delete", confirmDeleteId)
+                setConfirmDeleteId(null)
+              }}
+            >
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -418,11 +479,7 @@ function CampaignRow({
                   </button>
                   <div className="h-px bg-[#222] my-2" />
                   <button
-                    onClick={() => {
-                      if (confirm("Удалить рассылку?")) {
-                        onAction("delete", campaign.id)
-                      }
-                    }}
+                    onClick={() => onAction("delete", campaign.id)}
                     disabled={actionLoading === "delete" + campaign.id}
                     className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10"
                   >

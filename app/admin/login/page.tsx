@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 
-export default function AdminLoginPage() {
+function AdminLoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [token, setToken] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -25,7 +26,10 @@ export default function AdminLoginPage() {
       const data = await res.json()
       
       if (data.success) {
-        router.push("/admin")
+        const next = searchParams.get("next")
+        // Only allow internal admin paths to avoid open-redirects.
+        const safeNext = next && next.startsWith("/admin") ? next : "/admin"
+        router.push(safeNext)
       } else {
         setError(data.error || "Неверный токен")
       }
@@ -63,5 +67,13 @@ export default function AdminLoginPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black" />}>
+      <AdminLoginForm />
+    </Suspense>
   )
 }
