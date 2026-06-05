@@ -16,7 +16,8 @@ import {
   Bell,
   Search,
   Command,
-  ChevronRight
+  ChevronRight,
+  Megaphone
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -55,6 +56,12 @@ const navigation = [
     href: "/admin/auto-responses", 
     icon: MessageSquare,
     description: "Правила бота"
+  },
+  { 
+    name: "Яндекс Директ", 
+    href: "/admin/yandex-direct", 
+    icon: Megaphone,
+    description: "Рекламные кампании"
   },
   { 
     name: "Аналитика", 

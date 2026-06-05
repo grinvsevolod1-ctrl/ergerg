@@ -34,7 +34,7 @@ export async function execute(text: string, params?: unknown[]): Promise<number>
 }
 
 // Current schema version
-const SCHEMA_VERSION = 3
+const SCHEMA_VERSION = 4
 
 // Initialize database tables with versioning
 export async function initDatabase(): Promise<void> {
@@ -226,6 +226,18 @@ export async function initDatabase(): Promise<void> {
         updated_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- Yandex Direct action audit log (v4)
+      CREATE TABLE IF NOT EXISTS yandex_direct_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        action VARCHAR(50) NOT NULL,
+        campaign_id BIGINT,
+        campaign_name VARCHAR(500),
+        success BOOLEAN NOT NULL DEFAULT true,
+        error_message TEXT,
+        details JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
       -- Quick reply templates for operators
       CREATE TABLE IF NOT EXISTS quick_reply_templates (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -253,6 +265,8 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_email_unsubscribes_email ON email_unsubscribes(email);
       CREATE INDEX IF NOT EXISTS idx_auto_response_enabled ON auto_response_rules(enabled, priority DESC);
       CREATE INDEX IF NOT EXISTS idx_quick_reply_category ON quick_reply_templates(category);
+      CREATE INDEX IF NOT EXISTS idx_yandex_direct_logs_created ON yandex_direct_logs(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_yandex_direct_logs_campaign ON yandex_direct_logs(campaign_id);
     `)
     
     // Record migration

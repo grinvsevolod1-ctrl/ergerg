@@ -25,6 +25,7 @@ import {
   Plus,
   Tag
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -121,13 +122,22 @@ export default function LeadsPage() {
         credentials: 'include',
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        setLeads(data.leads)
-        setTotalPages(data.pagination.pages)
+      if (response.status === 401) {
+        toast.error('Сессия истекла. Войдите снова.')
+        return
       }
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+      setLeads(Array.isArray(data.leads) ? data.leads : [])
+      setTotalPages(data.pagination?.pages ?? 1)
     } catch (error) {
       console.error('Error fetching leads:', error)
+      toast.error('Не удалось загрузить лиды')
+      setLeads([])
     } finally {
       setLoading(false)
     }
@@ -163,12 +173,16 @@ export default function LeadsPage() {
         body: JSON.stringify({ status }),
       })
 
-      if (response.ok) {
-        setLeads(leads.map(l => l.id === leadId ? { ...l, status: status as Lead['status'] } : l))
-        fetchStats()
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
       }
+
+      setLeads(leads.map(l => l.id === leadId ? { ...l, status: status as Lead['status'] } : l))
+      fetchStats()
+      toast.success(`Статус изменён: ${statusConfig[status as Lead['status']]?.label ?? status}`)
     } catch (error) {
       console.error('Error updating status:', error)
+      toast.error('Не удалось обновить статус')
     } finally {
       setUpdatingStatus(null)
       setActiveMenu(null)
@@ -191,8 +205,13 @@ export default function LeadsPage() {
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Скопировано')
+    } catch {
+      toast.error('Не удалось скопировать')
+    }
   }
 
   const hasActiveFilters = filters.status !== 'all' || filters.source !== 'all' || filters.search

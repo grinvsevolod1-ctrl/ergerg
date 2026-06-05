@@ -24,9 +24,16 @@ export async function GET(request: NextRequest) {
     // Build filters
     const filters: LeadFilters = {}
     
+    // NOTE: the admin UI + DB use this status set (new/in_progress/completed/rejected).
+    // Keep this in sync with app/api/admin/leads/[id]/route.ts and the leads page.
     const status = searchParams.get('status')
-    if (status === 'new' || status === 'contacted' || status === 'qualified' || status === 'sold' || status === 'lost') {
-      filters.status = status
+    if (
+      status === 'new' ||
+      status === 'in_progress' ||
+      status === 'completed' ||
+      status === 'rejected'
+    ) {
+      filters.status = status as LeadFilters['status']
     }
 
     const source = searchParams.get('source')

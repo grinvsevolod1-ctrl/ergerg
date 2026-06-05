@@ -13,7 +13,8 @@ import {
   Key,
   Activity,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Megaphone
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -30,6 +31,7 @@ export default function SettingsPage() {
     { name: "SMTP", status: "unknown" },
     { name: "Redis", status: "unknown" },
     { name: "PostgreSQL", status: "unknown" },
+    { name: "Yandex Direct", status: "unknown" },
   ])
 
   const [notifications, setNotifications] = useState({
@@ -65,6 +67,19 @@ export default function SettingsPage() {
               : c
           )
         )
+      } else if (service === "Yandex Direct") {
+        const res = await fetch("/api/admin/yandex-direct", { credentials: "include" })
+        const data = await res.json().catch(() => ({}))
+        const latency = Date.now() - startTime
+        const ok = res.ok && data?.config?.configured && !data?.error
+
+        setConnections(prev =>
+          prev.map(c =>
+            c.name === service
+              ? { ...c, status: ok ? "connected" : "disconnected", latency }
+              : c
+          )
+        )
       } else {
         // For Redis and PostgreSQL, we'll simulate with a general health check
         const res = await fetch("/api/health", { 
@@ -96,6 +111,7 @@ export default function SettingsPage() {
     { category: "База данных", items: ["PostgreSQL подключение", "Redis кеш"], status: "configured" },
     { category: "Email", items: ["SMTP сервер", "DKIM подпись"], status: "configured" },
     { category: "Telegram", items: ["Бот уведомлений"], status: "configured" },
+    { category: "Реклама", items: ["Yandex Direct API", "Песочница / Боевой режим"], status: "configured" },
     { category: "Безопасность", items: ["Шифрование данных", "Авторизация"], status: "configured" },
   ]
 
@@ -117,7 +133,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Connection Status Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {connections.map((conn) => (
           <motion.div
             key={conn.name}
@@ -137,6 +153,7 @@ export default function SettingsPage() {
                 {conn.name === "SMTP" && <Mail className="w-5 h-5 text-[#888]" />}
                 {conn.name === "Redis" && <Database className="w-5 h-5 text-[#888]" />}
                 {conn.name === "PostgreSQL" && <Database className="w-5 h-5 text-[#888]" />}
+                {conn.name === "Yandex Direct" && <Megaphone className="w-5 h-5 text-[#888]" />}
                 <span className="font-medium text-white">{conn.name}</span>
               </div>
               <Button

@@ -117,6 +117,24 @@ CREATE TABLE IF NOT EXISTS preview_shares (
 CREATE INDEX IF NOT EXISTS idx_preview_expires ON preview_shares(expires_at);
 
 -- ─────────────────────────────────────────────────────────────────
+-- Таблица аудита действий Яндекс Директа (управление кампаниями)
+-- ─────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS yandex_direct_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  action VARCHAR(50) NOT NULL,           -- create, update, suspend, resume, archive, unarchive, delete
+  campaign_id BIGINT,
+  campaign_name VARCHAR(500),
+  success BOOLEAN NOT NULL DEFAULT true,
+  error_message TEXT,
+  details JSONB DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Индексы для yandex_direct_logs
+CREATE INDEX IF NOT EXISTS idx_yandex_direct_logs_created ON yandex_direct_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_yandex_direct_logs_campaign ON yandex_direct_logs(campaign_id);
+
+-- ─────────────────────────────────────────────────────────────────
 -- Функция автообновления updated_at
 -- ─────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION update_updated_at_column()
