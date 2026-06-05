@@ -6,15 +6,17 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/api/', '/_next/', '/static/'],
+        disallow: ['/api/', '/admin/', '/unsubscribe', '/_next/', '/static/'],
       },
       {
         userAgent: 'Googlebot',
         allow: '/',
+        disallow: ['/api/', '/admin/', '/unsubscribe'],
       },
       {
         userAgent: 'Yandexbot',
         allow: '/',
+        disallow: ['/api/', '/admin/', '/unsubscribe'],
       },
     ],
     sitemap: 'https://netnext.site/sitemap.xml',
