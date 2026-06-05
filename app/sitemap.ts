@@ -1,44 +1,34 @@
 import type { MetadataRoute } from 'next'
 
+const baseUrl = 'https://netnext.site'
+
+/**
+ * Only real, indexable URLs belong in the sitemap.
+ * Hash anchors (e.g. /#services) are not separate documents and are ignored by
+ * crawlers, and /projects is a redirect to /#portfolio — both are excluded.
+ * /unsubscribe is intentionally omitted (noindex utility page).
+ */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://netnext.site'
-  
+  const now = new Date()
+
   return [
     {
       url: baseUrl,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: 'weekly',
       priority: 1,
     },
     {
       url: `${baseUrl}/privacy`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
+      lastModified: now,
+      changeFrequency: 'yearly',
       priority: 0.3,
     },
     {
       url: `${baseUrl}/terms`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
+      lastModified: now,
+      changeFrequency: 'yearly',
       priority: 0.3,
-    },
-    {
-      url: `${baseUrl}/#services`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/#portfolio`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/#contact`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.7,
     },
   ]
 }

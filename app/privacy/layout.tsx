@@ -3,6 +3,9 @@ import { Metadata } from "next"
 export const metadata: Metadata = {
   title: "Политика конфиденциальности | NetNext",
   description: "Политика конфиденциальности веб-студии NetNext",
+  alternates: {
+    canonical: "https://netnext.site/privacy",
+  },
 }
 
 export default function PrivacyLayout({

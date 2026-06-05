@@ -16,6 +16,7 @@ import {
   Headphones,
   X
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/admin/page-header"
@@ -55,8 +56,8 @@ export default function ChatsPage() {
   })
   const [showFilters, setShowFilters] = useState(false)
 
-  const fetchSessions = useCallback(async () => {
-    setLoading(true)
+  const fetchSessions = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -77,15 +78,22 @@ export default function ChatsPage() {
         credentials: 'include',
       })
 
+      if (response.status === 401) {
+        if (!silent) toast.error("Сессия истекла. Войдите снова.")
+        return
+      }
       if (response.ok) {
         const data = await response.json()
         setSessions(data.sessions)
         setTotalPages(data.pagination.pages)
+      } else if (!silent) {
+        toast.error("Не удалось загрузить чаты")
       }
     } catch (error) {
       console.error('Error fetching sessions:', error)
+      if (!silent) toast.error("Ошибка соединения с сервером")
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [page, filters])
 
@@ -111,7 +119,7 @@ export default function ChatsPage() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchSessions()
+      fetchSessions(true)
       fetchStats()
     }, 30000)
     return () => clearInterval(interval)

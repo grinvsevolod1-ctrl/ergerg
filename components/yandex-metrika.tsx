@@ -2,6 +2,7 @@
 
 import { useEffect, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { METRIKA_ID } from '@/lib/analytics'
 
 declare global {
   interface Window {
@@ -10,8 +11,6 @@ declare global {
     }
   }
 }
-
-const METRIKA_ID = 107080970
 
 function YandexMetrikaInner() {
   const pathname = usePathname()

@@ -21,6 +21,7 @@ import {
   Smile,
   HelpCircle
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -81,6 +82,11 @@ export default function AutoResponsesPage() {
         }),
       ])
 
+      if (rulesResponse.status === 401 || templatesResponse.status === 401) {
+        toast.error("Сессия истекла. Войдите снова.")
+        return
+      }
+
       if (rulesResponse.ok) {
         const data = await rulesResponse.json()
         setRules(data.rules || [])
@@ -91,8 +97,13 @@ export default function AutoResponsesPage() {
         setTemplates(data.templates || [])
         setCategories(data.categories || [])
       }
+
+      if (!rulesResponse.ok && !templatesResponse.ok) {
+        toast.error("Не удалось загрузить данные автоответов")
+      }
     } catch (error) {
       console.error('Error fetching data:', error)
+      toast.error("Ошибка соединения с сервером")
     } finally {
       setLoading(false)
     }
@@ -104,15 +115,21 @@ export default function AutoResponsesPage() {
 
   const toggleRule = async (rule: AutoResponseRule) => {
     try {
-      await fetch(`/api/admin/auto-responses/${rule.id}`, {
+      const res = await fetch(`/api/admin/auto-responses/${rule.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ enabled: !rule.enabled }),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `HTTP ${res.status}`)
+      }
       setRules(rules.map(r => r.id === rule.id ? { ...r, enabled: !r.enabled } : r))
+      toast.success(rule.enabled ? "Правило отключено" : "Правило включено")
     } catch (error) {
       console.error('Error toggling rule:', error)
+      toast.error(error instanceof Error ? error.message : "Не удалось изменить правило")
     }
   }
 
@@ -120,13 +137,19 @@ export default function AutoResponsesPage() {
     if (!confirm('Удалить правило?')) return
 
     try {
-      await fetch(`/api/admin/auto-responses/${id}`, {
+      const res = await fetch(`/api/admin/auto-responses/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `HTTP ${res.status}`)
+      }
       setRules(rules.filter(r => r.id !== id))
+      toast.success("Правило удалено")
     } catch (error) {
       console.error('Error deleting rule:', error)
+      toast.error(error instanceof Error ? error.message : "Не удалось удалить правило")
     }
   }
 
@@ -134,63 +157,77 @@ export default function AutoResponsesPage() {
     if (!confirm('Удалить шаблон?')) return
 
     try {
-      await fetch(`/api/admin/auto-responses/${id}?type=quick-reply`, {
+      const res = await fetch(`/api/admin/auto-responses/${id}?type=quick-reply`, {
         method: 'DELETE',
         credentials: 'include',
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `HTTP ${res.status}`)
+      }
       setTemplates(templates.filter(t => t.id !== id))
+      toast.success("Шаблон удалён")
     } catch (error) {
       console.error('Error deleting template:', error)
+      toast.error(error instanceof Error ? error.message : "Не удалось удалить шаблон")
     }
   }
 
   const saveRule = async (rule: Partial<AutoResponseRule>) => {
     try {
-      if (editingRule) {
-        await fetch(`/api/admin/auto-responses/${editingRule.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(rule),
-        })
-      } else {
-        await fetch('/api/admin/auto-responses', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(rule),
-        })
+      const res = editingRule
+        ? await fetch(`/api/admin/auto-responses/${editingRule.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(rule),
+          })
+        : await fetch('/api/admin/auto-responses', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(rule),
+          })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `HTTP ${res.status}`)
       }
+      toast.success(editingRule ? "Правило обновлено" : "Правило создано")
       setEditingRule(null)
       setShowNewRule(false)
       fetchData()
     } catch (error) {
       console.error('Error saving rule:', error)
+      toast.error(error instanceof Error ? error.message : "Не удалось сохранить правило")
     }
   }
 
   const saveTemplate = async (template: Partial<QuickReplyTemplate>) => {
     try {
-      if (editingTemplate) {
-        await fetch(`/api/admin/auto-responses/${editingTemplate.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ ...template, type: 'quick-reply' }),
-        })
-      } else {
-        await fetch('/api/admin/auto-responses', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ ...template, type: 'quick-reply' }),
-        })
+      const res = editingTemplate
+        ? await fetch(`/api/admin/auto-responses/${editingTemplate.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ ...template, type: 'quick-reply' }),
+          })
+        : await fetch('/api/admin/auto-responses', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ ...template, type: 'quick-reply' }),
+          })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `HTTP ${res.status}`)
       }
+      toast.success(editingTemplate ? "Шаблон обновлён" : "Шаблон создан")
       setEditingTemplate(null)
       setShowNewTemplate(false)
       fetchData()
     } catch (error) {
       console.error('Error saving template:', error)
+      toast.error(error instanceof Error ? error.message : "Не удалось сохранить шаблон")
     }
   }
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react"
 import { ArrowRight, Code2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { reachGoal, YM_GOALS } from "@/lib/analytics"
 
 interface HeroSectionProps {
   onNavigate: (section: string) => void
@@ -76,7 +77,10 @@ export function HeroSection({ onNavigate }: HeroSectionProps) {
               <Button 
                 size="lg" 
                 className="group text-[15px] sm:text-base px-6 sm:px-7 md:px-8 h-12 sm:h-[52px] w-full sm:w-auto font-medium shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
-                onClick={() => onNavigate("contact")}
+                onClick={() => {
+                  reachGoal(YM_GOALS.clickCtaDiscuss)
+                  onNavigate("contact")
+                }}
               >
                 Обсудить проект
                 <ArrowRight className="ml-2.5 w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -85,7 +89,10 @@ export function HeroSection({ onNavigate }: HeroSectionProps) {
                 variant="outline" 
                 size="lg" 
                 className="text-[15px] sm:text-base px-6 sm:px-7 md:px-8 h-12 sm:h-[52px] bg-transparent w-full sm:w-auto font-medium hover:bg-secondary/80 transition-all"
-                onClick={() => onNavigate("services")}
+                onClick={() => {
+                  reachGoal(YM_GOALS.clickCtaPortfolio)
+                  onNavigate("services")
+                }}
               >
                 <Code2 className="mr-2 w-4 h-4" />
                 Наши услуги

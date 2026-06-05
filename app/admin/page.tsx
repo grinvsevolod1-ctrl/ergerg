@@ -16,6 +16,7 @@ import {
   Clock,
   Target
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { StatsCard } from "@/components/admin/stats-card"
@@ -59,8 +60,8 @@ export default function AdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchData = useCallback(async () => {
-    setLoading(true)
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
 
     try {
       const [mailingsRes, chatsRes, leadsRes] = await Promise.all([
@@ -96,14 +97,15 @@ export default function AdminDashboard() {
       })
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
+      if (!silent) toast.error('Не удалось загрузить данные дашборда')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 60000)
+    const interval = setInterval(() => fetchData(true), 60000)
     return () => clearInterval(interval)
   }, [fetchData])
 
@@ -112,7 +114,7 @@ export default function AdminDashboard() {
       <PageHeader
         title="Dashboard"
         description="Обзор системы и ключевые метрики"
-        onRefresh={fetchData}
+        onRefresh={() => fetchData()}
         loading={loading}
       />
 

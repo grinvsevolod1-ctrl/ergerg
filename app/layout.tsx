@@ -59,7 +59,7 @@ export const metadata: Metadata = {
     description: 'Создаём современные сайты и веб-приложения. Веб-разработка, мобильные приложения, UI/UX дизайн, AI-решения.',
     images: [
       {
-        url: '/og-image.jpg',
+        url: '/og-image.png',
         width: 1200,
         height: 630,
         alt: 'NetNext - Веб-студия разработки',
@@ -70,7 +70,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'NetNext - Веб-студия разработки',
     description: 'Создаём современные сайты и веб-приложения. Веб-разработка, мобильные приложения, UI/UX дизайн.',
-    images: ['/og-image.jpg'],
+    images: ['/og-image.png'],
   },
   robots: {
     index: true,
@@ -119,35 +119,96 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
-              "@type": "Organization",
-              "name": "NetNext Studio",
-              "legalName": "ООО \"НетНекст\"",
-              "url": "https://netnext.site",
-              "logo": "https://netnext.site/icon.svg",
-              "description": "Веб-студия разработки современных сайтов и приложений",
-              "taxID": "193962237",
-              "address": {
-                "@type": "PostalAddress",
-                "streetAddress": "ул. Фабрициуса 9, пом. 1 (кабинет 31)",
-                "addressLocality": "Минск",
-                "postalCode": "220007",
-                "addressRegion": "Московский район",
-                "addressCountry": "BY"
-              },
-              "contactPoint": {
-                "@type": "ContactPoint",
-                "email": "hello@netnext.site",
-                "contactType": "customer service",
-                "availableLanguage": ["Russian", "English"]
-              },
-              "sameAs": [
-                "https://t.me/netnextadminbot"
-              ],
-              "areaServed": {
-                "@type": "Country",
-                "name": "Belarus"
-              },
-              "priceRange": "BrBr"
+              "@graph": [
+                {
+                  "@type": ["Organization", "ProfessionalService"],
+                  "@id": "https://netnext.site/#organization",
+                  "name": "NetNext Studio",
+                  "legalName": "ООО \"НетНекст\"",
+                  "url": "https://netnext.site",
+                  "logo": {
+                    "@type": "ImageObject",
+                    "url": "https://netnext.site/icon.svg"
+                  },
+                  "image": "https://netnext.site/og-image.png",
+                  "description": "Веб-студия разработки современных сайтов, веб-приложений и запуска рекламы. Минск, Беларусь.",
+                  "taxID": "193962237",
+                  "foundingDate": "2020",
+                  "address": {
+                    "@type": "PostalAddress",
+                    "streetAddress": "ул. Фабрициуса 9, пом. 1 (кабинет 31)",
+                    "addressLocality": "Минск",
+                    "postalCode": "220007",
+                    "addressRegion": "Московский район",
+                    "addressCountry": "BY"
+                  },
+                  "contactPoint": {
+                    "@type": "ContactPoint",
+                    "email": "hello@netnext.site",
+                    "telephone": "+375291414555",
+                    "contactType": "customer service",
+                    "areaServed": "BY",
+                    "availableLanguage": ["Russian", "English"]
+                  },
+                  "sameAs": [
+                    "https://t.me/netnextadminbot"
+                  ],
+                  "areaServed": {
+                    "@type": "Country",
+                    "name": "Belarus"
+                  },
+                  "priceRange": "$$",
+                  "hasOfferCatalog": {
+                    "@type": "OfferCatalog",
+                    "name": "Услуги NetNext",
+                    "itemListElement": [
+                      {
+                        "@type": "Offer",
+                        "itemOffered": {
+                          "@type": "Service",
+                          "name": "Разработка сайтов",
+                          "description": "Корпоративные сайты, лендинги и интернет-магазины под ключ."
+                        }
+                      },
+                      {
+                        "@type": "Offer",
+                        "itemOffered": {
+                          "@type": "Service",
+                          "name": "Разработка веб-приложений",
+                          "description": "Веб-приложения и SaaS на Next.js и React."
+                        }
+                      },
+                      {
+                        "@type": "Offer",
+                        "itemOffered": {
+                          "@type": "Service",
+                          "name": "UI/UX дизайн",
+                          "description": "Проектирование интерфейсов и дизайн под ключ."
+                        }
+                      },
+                      {
+                        "@type": "Offer",
+                        "itemOffered": {
+                          "@type": "Service",
+                          "name": "Запуск и ведение рекламы",
+                          "description": "Настройка и сопровождение рекламных кампаний, включая Яндекс Директ."
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "@type": "WebSite",
+                  "@id": "https://netnext.site/#website",
+                  "url": "https://netnext.site",
+                  "name": "NetNext Studio",
+                  "description": "Веб-студия разработки современных сайтов и приложений.",
+                  "inLanguage": "ru-BY",
+                  "publisher": {
+                    "@id": "https://netnext.site/#organization"
+                  }
+                }
+              ]
             })
           }}
         />

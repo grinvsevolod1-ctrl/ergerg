@@ -4,6 +4,9 @@ import { ArrowLeft, Building2, MapPin, Mail, FileText, Phone, Calendar, Briefcas
 export const metadata = {
   title: "Условия использования | NetNext",
   description: "Условия использования и информация о компании ООО НетНекст. УНП 193962237.",
+  alternates: {
+    canonical: "https://netnext.site/terms",
+  },
 }
 
 export default function TermsPage() {

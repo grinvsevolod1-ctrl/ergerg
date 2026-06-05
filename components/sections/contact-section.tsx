@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { PhoneInput } from "@/components/phone-input"
 import { TelegramIcon, WhatsAppIcon, ViberIcon } from "@/components/icons"
+import { reachGoal, YM_GOALS, contactMethodGoal } from "@/lib/analytics"
 
 /* ── Business description templates ── */
 const businessTemplates: Record<string, (business: string) => string> = {
@@ -191,7 +192,7 @@ const contactMethods = [
 function validateEmail(email: string): string | null {
   if (!email) return "Введите email"
   const re = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
-  if (!re.test(email)) return "Некорректный формат email"
+  if (!re.test(email)) return "Некорректный фор��ат email"
   const domainPart = email.split("@")[1]?.split(".").pop()
   if (!email.includes(".") || !domainPart || domainPart.length < 2) return "Проверьте домен email"
   return null
@@ -424,6 +425,10 @@ export function ContactSection() {
       // silent fail
     }
 
+    // Conversion goals: form submitted + which contact method was used.
+    reachGoal(YM_GOALS.trustForm, { source: fromStartWidget ? 'start_widget' : 'contact_form' })
+    reachGoal(contactMethodGoal(contactMethod))
+
     setIsSubmitted(true)
     setIsLoading(false)
     setFormState({ name: "", email: "", telegram: "", phone: "", projectType: "", budget: "", message: "" })
@@ -485,6 +490,7 @@ export function ContactSection() {
                   <a 
                     key={item.label} 
                     href={item.href}
+                    onClick={() => reachGoal(YM_GOALS.clickContactInfo, { channel: item.label })}
                     className="group flex items-center gap-4 p-4 rounded-2xl bg-card border border-border/50 hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
                   >
                     <div 
@@ -514,6 +520,7 @@ export function ContactSection() {
                     href={m.href} 
                     target="_blank" 
                     rel="noopener noreferrer"
+                    onClick={() => reachGoal(YM_GOALS.clickMessenger, { messenger: m.label })}
                     className="flex flex-col items-center gap-2 p-4 rounded-2xl border border-border/50 hover:border-opacity-50 transition-all duration-300 hover:shadow-lg group"
                     style={{ borderColor: `${m.color}30` }}
                   >

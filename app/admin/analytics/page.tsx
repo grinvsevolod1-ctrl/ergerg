@@ -16,6 +16,7 @@ import {
   MousePointer,
   Clock
 } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "@/components/admin/page-header"
@@ -51,12 +52,19 @@ export default function AnalyticsPage() {
         credentials: 'include',
       })
 
+      if (response.status === 401) {
+        toast.error("Сессия истекла. Войдите снова.")
+        return
+      }
       if (response.ok) {
         const result = await response.json()
         setData(result)
+      } else {
+        toast.error("Не удалось загрузить аналитику")
       }
     } catch (error) {
       console.error('Error fetching analytics:', error)
+      toast.error("Ошибка соединения с сервером")
     } finally {
       setLoading(false)
     }
@@ -401,7 +409,7 @@ export default function AnalyticsPage() {
       ) : (
         <div className="flex flex-col items-center justify-center h-64 text-[#888]">
           <BarChart3 className="w-12 h-12 mb-3 opacity-50" />
-          <p>Не удалось загрузить данные</p>
+          <p>Не у��алось загрузить данные</p>
         </div>
       )}
     </div>

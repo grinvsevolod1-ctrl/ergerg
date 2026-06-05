@@ -16,6 +16,7 @@ import {
   Clock,
 } from "lucide-react"
 import { CreativeIcon } from "@/components/icons"
+import { reachGoal, YM_GOALS } from "@/lib/analytics"
 
 /* ───────────────────────────────────────────────
    Floating CTA notification -- appears after user
@@ -116,6 +117,11 @@ export function FloatingCTA() {
     } catch {
       // silent fail
     }
+
+    // Conversion goals: quick popup form + the shared "trustform" goal.
+    reachGoal(YM_GOALS.quickFormSubmit)
+    reachGoal(YM_GOALS.trustForm, { source: 'quick_form' })
+
     setIsLoading(false)
     setIsSubmitted(true)
   }
