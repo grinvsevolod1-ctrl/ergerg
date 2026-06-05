@@ -142,7 +142,8 @@ export async function transcribeAudio(
     const baseUrl = getOllamaBaseUrl()
     
     // Convert audio to base64
-    const base64Audio = Buffer.from(audioData).toString('base64')
+    const audioBuffer = audioData instanceof ArrayBuffer ? Buffer.from(audioData) : audioData
+    const base64Audio = audioBuffer.toString('base64')
     
     // Call Ollama with audio
     // Note: Ollama's Whisper support may vary - this is a common API pattern

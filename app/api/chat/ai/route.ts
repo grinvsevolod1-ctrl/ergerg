@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
           'simple', // FAST server for quick responses
           messages,
           {
-            model: AI_SERVERS.fast.complexModel, // qwen2.5:3b
+            model: AI_SERVERS.fast.defaultModel, // Use defaultModel instead of complexModel
             system: NETNEXT_PERSONA,
             temperature: 0.7,
             maxTokens: 250

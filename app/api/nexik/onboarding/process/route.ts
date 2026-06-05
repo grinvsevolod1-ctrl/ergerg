@@ -83,12 +83,14 @@ ${stepPrompt}
       { role: 'user' as const, content: input }
     ]
 
-    const aiResponse = await getAIResponse({
-      messages,
-      systemPrompt,
-      maxTokens: 300,
-      temperature: 0.7
-    })
+    const aiResponse = await getAIResponse(
+      messages.map(m => `${m.role}: ${m.content}`).join('\n'),
+      {
+        system: systemPrompt,
+        maxTokens: 300,
+        temperature: 0.7
+      }
+    )
 
     // Extract data based on step
     const extractedData = extractDataFromInput(input, currentStep, collectedData)

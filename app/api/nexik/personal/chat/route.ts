@@ -46,12 +46,14 @@ export async function POST(req: NextRequest) {
     ]
 
     // Get AI response
-    const response = await getAIResponse({
-      messages,
-      systemPrompt,
-      maxTokens: 1000,
-      temperature: 0.7
-    })
+    const response = await getAIResponse(
+      messages.map(m => `${m.role}: ${m.content}`).join('\n'),
+      {
+        system: systemPrompt,
+        maxTokens: 1000,
+        temperature: 0.7
+      }
+    )
 
     // Save messages to DB
     const conversationId = `personal_${session.org.id}_${Date.now()}`

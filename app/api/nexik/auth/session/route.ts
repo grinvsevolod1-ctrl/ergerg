@@ -26,8 +26,7 @@ export async function GET() {
           name: session.org.name,
           slug: session.org.slug,
           plan: session.org.plan,
-          ai_enabled: session.org.ai_enabled,
-          ai_model: session.org.ai_model,
+          ai_config: session.org.ai_config,
           created_at: session.org.created_at
         }
       }

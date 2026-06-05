@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  //  // Disabled - use pnpm start instead
+  // TypeScript errors are now fixed - enable strict checking
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 
   // reactCompiler: true, // Disabled - requires babel-plugin-react-compiler

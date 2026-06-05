@@ -115,19 +115,17 @@ async function generateAIResponse(
 ): Promise<string> {
   try {
     // Try to use the AI router
-    const { generateResponse } = await import('@/lib/ai/router')
+    const { getAIResponse } = await import('@/lib/ai/router')
     
-    const result = await generateResponse(message, {
-      companyName,
-      companyDescription: `AI-ассистент ${assistantName} для компании ${companyName}`,
-      useRAG: true,
-      previousMessages: previousMessages?.slice(-5).map(m => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content
-      }))
+    const systemPrompt = `Ты ${assistantName}, AI-ассистент компании ${companyName}. Отвечай кратко и по делу.`
+    
+    const result = await getAIResponse(message, {
+      system: systemPrompt,
+      temperature: 0.7,
+      maxTokens: 300
     })
     
-    return result.text
+    return result
   } catch (error) {
     console.error('[Nexik Chat] AI generation error:', error)
     // Fallback to helpful generic response

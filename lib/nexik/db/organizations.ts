@@ -124,12 +124,14 @@ export async function createOrganization(data: {
   }
 
   // Create organization
-const orgs = await query<Organization>(
-  `INSERT INTO nexik_organizations (name, slug, domain, owner_email, plan, messages_limit)
-   VALUES ($1, $2, $3, $4, 'free', 500)
-   RETURNING *`,
-  [data.name, slug, data.domain || null, data.owner_email]
-)
+  const orgs = await query<Organization>(
+    `INSERT INTO nexik_organizations (name, slug, domain, owner_email, plan, messages_limit)
+     VALUES ($1, $2, $3, $4, 'free', 500)
+     RETURNING *`,
+    [data.name, slug, data.domain || null, data.owner_email]
+  )
+  const org = orgs[0]
+  
   // Create owner member
   const members = await query<OrgMember>(
     `INSERT INTO nexik_org_members (org_id, email, password_hash, name, role, email_verified)

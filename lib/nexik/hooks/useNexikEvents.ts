@@ -66,12 +66,12 @@ export function useNexikEvents({
             break
           
           case 'new_message':
-            if (playSound) notificationSound.playMessage()
+            if (playSound) notificationSound.playNotification()
             onMessage?.(data.data as { conversationId: string; message: unknown })
             break
           
           case 'new_conversation':
-            if (playSound) notificationSound.playNewConversation()
+            if (playSound) notificationSound.playUrgent()
             onNewConversation?.(data.data as { conversationId: string; visitor: unknown })
             break
           

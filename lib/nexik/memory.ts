@@ -57,27 +57,27 @@ export async function getOrCreateVisitor(visitorId: string): Promise<VisitorMemo
     )
     
     if (result && Array.isArray(result) && result.length > 0) {
-      const row = result[0]
+      const row = result[0] as unknown as Record<string, unknown>
       // Обновляем last_seen
       await execute(
         `UPDATE nexik_visitors SET last_seen = NOW(), total_interactions = total_interactions + 1 WHERE visitor_id = $1`,
         [visitorId]
       )
       return {
-        visitorId: row.visitor_id,
-        name: row.name,
-        email: row.email,
-        phone: row.phone,
-        company: row.company,
-        businessType: row.business_type,
-        businessDescription: row.business_description,
-        emotionalState: row.emotional_state || 'neutral',
-        totalInteractions: (row.total_interactions || 0) + 1,
-        firstSeen: row.first_seen,
+        visitorId: row.visitor_id as string,
+        name: row.name as string | undefined,
+        email: row.email as string | undefined,
+        phone: row.phone as string | undefined,
+        company: row.company as string | undefined,
+        businessType: row.business_type as string | undefined,
+        businessDescription: row.business_description as string | undefined,
+        emotionalState: (row.emotional_state as string) || 'neutral',
+        totalInteractions: ((row.total_interactions as number) || 0) + 1,
+        firstSeen: row.first_seen as Date,
         lastSeen: new Date(),
-        tags: row.tags || [],
-        notes: row.notes || []
-      }
+        tags: (row.tags as string[]) || [],
+        notes: (row.notes as string[]) || []
+      } as VisitorMemory
     }
     
     // Создаём нового
@@ -188,6 +188,7 @@ export async function saveMessage(
     intent?: string
     extractedFacts?: string[]
     promises?: string[]
+    source?: string
   }
 ): Promise<void> {
   try {

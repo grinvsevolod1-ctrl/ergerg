@@ -226,8 +226,14 @@ export async function exportTrainingData(
     })
     
     if (qualityScore >= minScore) {
+      // Transform sender_type to role for training format
+      const messagesWithRole = messages.map(m => ({
+        role: m.sender_type === 'visitor' ? 'user' : 'assistant',
+        content: m.content
+      }))
+      
       const formatted = conversationToTrainingFormat(
-        messages,
+        messagesWithRole,
         options.includeSystemPrompt ? options.systemPrompt : undefined
       )
       
@@ -602,12 +608,12 @@ export async function deleteCustomModel(modelId: string, orgId: string): Promise
   }
   
   // Delete from database
-  const result = await execute(
+  const rowCount = await execute(
     'DELETE FROM nexik_custom_models WHERE id = $1 AND org_id = $2',
     [modelId, orgId]
   )
   
-  return result.rowCount > 0
+  return rowCount > 0
 }
 
 // ==========================================

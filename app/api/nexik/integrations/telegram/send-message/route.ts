@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Получаем сессию Telegram для организации
-  const integrations = await query(
+  const integrations = await query<{ access_token: string }>(
     'SELECT access_token FROM nexik_integrations WHERE org_id = $1 AND platform = $2 AND is_active = true',
     [session.member.org_id, 'telegram']
   )

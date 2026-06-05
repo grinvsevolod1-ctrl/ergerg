@@ -5,7 +5,7 @@
 
 import { getMemoryContext, type MemoryContext } from './memory'
 import { getOrgPersonality, buildPersonalityPrompt, type Personality } from './personality'
-import { searchKnowledge, type KnowledgeChunk } from '../db/knowledge'
+import { searchKnowledge, type SearchResult } from '../db/knowledge'
 import { query } from '@/lib/db'
 
 // ============================================================
@@ -239,7 +239,7 @@ function buildMemoryPrompt(memoryContext: MemoryContext): string {
 /**
  * Build knowledge prompt from RAG results
  */
-function buildKnowledgePrompt(results: KnowledgeSearchResult[]): string {
+function buildKnowledgePrompt(results: SearchResult[]): string {
   if (results.length === 0) {
     return ''
   }
@@ -248,7 +248,7 @@ function buildKnowledgePrompt(results: KnowledgeSearchResult[]): string {
   parts.push('Используй эту информацию для ответа, но не копируй дословно:\n')
   
   for (const result of results) {
-    parts.push(`[${result.title || 'Документ'}]`)
+    parts.push(`[${result.doc_title || 'Документ'}]`)
     parts.push(result.content)
     parts.push('')
   }
@@ -290,7 +290,7 @@ async function searchKnowledgeWithContext(
   currentMessage: string,
   history: ConversationMessage[],
   maxChunks: number
-): Promise<KnowledgeChunk[]> {
+): Promise<SearchResult[]> {
   // Build search query from current message + recent context
   const recentUserMessages = history
     .filter(m => m.role === 'user')

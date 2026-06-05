@@ -184,6 +184,7 @@ export interface ConversationFilters {
   date_from?: Date
   date_to?: Date
   has_unread?: boolean
+  source?: 'all' | 'widget' | 'telegram'
 }
 
 export async function getOrgConversations(

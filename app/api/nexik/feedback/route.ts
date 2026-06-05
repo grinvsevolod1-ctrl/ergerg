@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
         [messageId]
       )
       
-      if (result.rows.length > 0) {
-        const row = result.rows[0] as { content: string; intent: string; user_message: string }
+      if (result && result.length > 0) {
+        const row = result[0] as unknown as { content: string; intent: string; user_message: string }
         
         if (row.user_message) {
           // Добавляем как хороший пример для обучения
@@ -136,11 +136,11 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       period,
-      stats: stats.rows[0],
-      needsImprovement: needsImprovement.rows,
-      recentDislikes: recentDislikes.rows,
-      learningRate: stats.rows[0] 
-        ? Math.round((stats.rows[0].total_likes / Math.max(1, stats.rows[0].total_likes + stats.rows[0].total_dislikes)) * 100) 
+      stats: stats[0] || {},
+      needsImprovement: needsImprovement || [],
+      recentDislikes: recentDislikes || [],
+      learningRate: stats[0] 
+        ? Math.round(((stats[0].total_likes || 0) / Math.max(1, (stats[0].total_likes || 0) + (stats[0].total_dislikes || 0))) * 100) 
         : 0
     })
     

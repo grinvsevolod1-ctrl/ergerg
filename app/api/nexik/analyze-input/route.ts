@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     const historyForAI = recentMessages.length > 0
       ? recentMessages.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
-      : conversationHistory.slice(-8).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+      : conversationHistory.slice(-8).map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
     const systemPrompt = buildNexikPrompt({
       mode: 'demo',

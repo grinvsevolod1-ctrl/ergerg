@@ -13,5 +13,5 @@ export async function GET(request: NextRequest) {
     [session.member.org_id, 'telegram']
   )
 
-  return NextResponse.json({ integrations: result.rows })
+  return NextResponse.json({ integrations: result || [] })
 }

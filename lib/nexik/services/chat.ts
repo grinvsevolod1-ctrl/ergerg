@@ -192,9 +192,8 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
     if (telegramConfig) {
       await notifyOperatorRequest(telegramConfig, {
         conversationId: conversation.id,
-        reason: sentimentResult.conversation.escalationReason || 'High priority conversation',
+        reason: sentimentResult.conversation.escalationReason || `High priority: ${request.message.slice(0, 100)}`,
         visitorName: request.visitor_info?.name,
-        lastMessage: request.message,
         dashboardUrl: process.env.NEXT_PUBLIC_BASE_URL || 'https://nexik.org/nexik/dashboard'
       })
     }
@@ -206,11 +205,15 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
   // Extract facts from message and update memory
   const extractedFacts = await extractFactsFromMessage(request.message)
   if (extractedFacts.length > 0 || request.visitor_info?.name || request.visitor_info?.email) {
+    // Map sentiment label to allowed values (exclude 'urgent')
+    const sentiment = sentimentResult.message.label
+    const allowedSentiment = (sentiment === 'urgent' ? 'negative' : sentiment) as 'positive' | 'neutral' | 'negative'
+    
     await updateVisitorMemory(memory.id, {
       name: request.visitor_info?.name || memory.name,
       email: request.visitor_info?.email || memory.email,
       phone: request.visitor_info?.phone || memory.phone,
-      last_sentiment: sentimentResult.message.label
+      last_sentiment: allowedSentiment
     })
   }
 
@@ -411,7 +414,7 @@ async function generateAIResponse(
   
   // Humanize the response using personality
   let finalContent = aiResult.response
-  if (personality && aiResult.server !== 'error') {
+  if (personality && aiResult.serverUsed !== 'error') {
     finalContent = humanizeResponse(finalContent, personality, {
       visitorName: memory?.name || undefined,
       isFirstMessage: history.length === 0,
@@ -420,7 +423,7 @@ async function generateAIResponse(
   }
   
   // Determine sender type
-  const senderType = aiResult.server === 'error' ? 'system' : 'ai'
+  const senderType = aiResult.serverUsed === 'error' ? 'system' : 'ai'
   
   // Extract quick replies if AI suggested them
   const quickReplies = senderType === 'ai'

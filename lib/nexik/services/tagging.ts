@@ -437,10 +437,10 @@ export async function getAutoTagRules(orgId: string): Promise<AutoTagRule[]> {
 export async function deleteAutoTagRule(ruleId: string, orgId: string): Promise<boolean> {
   const { execute } = await import('@/lib/db')
   
-  const result = await execute(
+  const rowCount = await execute(
     'DELETE FROM nexik_auto_tag_rules WHERE id = $1 AND org_id = $2',
     [ruleId, orgId]
   )
   
-  return result.rowCount > 0
+  return rowCount > 0
 }

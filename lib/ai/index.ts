@@ -11,12 +11,14 @@ export { getOllamaClient, OllamaClient, type OllamaMessage } from './providers'
 
 // Router (main API)
 export { 
-  generateResponse, 
-  streamResponse, 
+  routedChat,
+  getAIResponse,
   checkHealth, 
   getAIInfo,
-  type ChatContext, 
-  type GenerateOptions 
+  selectServer,
+  AI_SERVERS,
+  type ServerType,
+  type TaskType
 } from './router'
 
 // Knowledge Base / RAG

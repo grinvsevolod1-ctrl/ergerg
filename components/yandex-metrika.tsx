@@ -5,7 +5,9 @@ import { usePathname, useSearchParams } from 'next/navigation'
 
 declare global {
   interface Window {
-    ym: (id: number, action: string, target?: string, params?: any) => void
+    ym: ((id: number, action: string, ...args: unknown[]) => void) & {
+      a?: unknown[][]
+    }
   }
 }
 

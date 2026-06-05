@@ -578,12 +578,12 @@ export async function updateTrigger(
 export async function deleteTrigger(triggerId: string, orgId: string): Promise<boolean> {
   const { execute } = await import('@/lib/db')
   
-  const result = await execute(
+  const rowCount = await execute(
     'DELETE FROM nexik_proactive_triggers WHERE id = $1 AND org_id = $2',
     [triggerId, orgId]
   )
   
-  return result.rowCount > 0
+  return rowCount > 0
 }
 
 /**
