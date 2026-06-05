@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAllSessions, getChatStats, SessionFilters } from '@/lib/db/chat'
-
-// Verify admin token
-function verifyAdmin(request: NextRequest): boolean {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  const adminToken = process.env.ADMIN_API_TOKEN
-  return token === adminToken && !!adminToken
-}
+import { verifyAdminSession, unauthorizedResponse } from '@/lib/admin-auth'
 
 // GET /api/admin/chats - Get all chat sessions
 export async function GET(request: NextRequest) {
-  if (!verifyAdmin(request)) {
-    // return
+  if (!(await verifyAdminSession(request))) {
+    return unauthorizedResponse()
   }
 
   try {

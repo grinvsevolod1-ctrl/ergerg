@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAdminNotifications } from "@/hooks/use-admin-notifications"
+import { Toaster } from "sonner"
 
 const navigation = [
   { 
@@ -479,6 +480,8 @@ export default function AdminLayout({
           </div>
         </div>
       )}
+
+      <Toaster theme="dark" position="top-right" richColors closeButton />
     </div>
   )
 }

@@ -7,18 +7,12 @@ import {
   createQuickReply,
   getQuickReplyCategories,
 } from '@/lib/db/auto-responses'
-
-// Verify admin token
-function verifyAdmin(request: NextRequest): boolean {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  const adminToken = process.env.ADMIN_API_TOKEN
-  return token === adminToken && !!adminToken
-}
+import { verifyAdminSession, unauthorizedResponse } from '@/lib/admin-auth'
 
 // GET /api/admin/auto-responses
 export async function GET(request: NextRequest) {
-  if (!verifyAdmin(request)) {
-    // return
+  if (!(await verifyAdminSession(request))) {
+    return unauthorizedResponse()
   }
 
   try {
@@ -47,8 +41,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/admin/auto-responses
 export async function POST(request: NextRequest) {
-  if (!verifyAdmin(request)) {
-    // return
+  if (!(await verifyAdminSession(request))) {
+    return unauthorizedResponse()
   }
 
   try {

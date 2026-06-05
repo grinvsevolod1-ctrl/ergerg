@@ -1,5 +1,6 @@
 "use client"
 
+import { toast } from "sonner"
 import { useState, useEffect, useCallback } from "react"
 import { 
   Plus, 
@@ -87,7 +88,7 @@ export default function MailingsPage() {
 
       if (!res.ok) {
         const data = await res.json()
-        alert(data.error || "Действие не выполнено")
+        toast.error(data.error || "Действие не выполнено")
         return null
       }
 
@@ -718,7 +719,7 @@ function CreateCampaignModal({
 
   const handleSubmit = async () => {
     if (!name || !subject || !htmlContent) {
-      alert("Заполните все поля")
+      toast.error("Заполните все поля")
       return
     }
 
@@ -740,7 +741,7 @@ function CreateCampaignModal({
         onSuccess()
       } else {
         const data = await res.json()
-        alert(data.error || "Не удалось создать рассылку")
+        toast.error(data.error || "Не удалось создать рассылку")
       }
     } catch (err) {
       console.error("Create failed:", err)
@@ -876,7 +877,7 @@ function RecipientsModal({
     }).filter(r => r.email && r.email.includes("@"))
 
     if (recipients.length === 0) {
-      alert("Введите хотя бы один email")
+      toast.error("Введите хотя бы один email")
       return
     }
 
@@ -895,12 +896,12 @@ function RecipientsModal({
 
       if (res.ok) {
         const data = await res.json()
-        alert(`Добавлено ${data.added} получателей`)
+        toast.success(`Добавлено ${data.added} получателей`)
         onSuccess()
         onClose()
       } else {
         const data = await res.json()
-        alert(data.error || "Не удалось добавить получателей")
+        toast.error(data.error || "Не удалось добавить получателей")
       }
     } catch (err) {
       console.error("Add recipients failed:", err)

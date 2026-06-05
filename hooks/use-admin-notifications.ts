@@ -32,14 +32,11 @@ export function useAdminNotifications(pollInterval = 15000) {
   const [lastCheck, setLastCheck] = useState<Date>(new Date())
 
   const fetchNotifications = useCallback(async () => {
-    const token = localStorage.getItem("admin_token")
-    if (!token) return
-
     try {
       const response = await fetch(
         `/api/admin/notifications?since=${lastCheck.toISOString()}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         }
       )
 
@@ -47,14 +44,23 @@ export function useAdminNotifications(pollInterval = 15000) {
         const data = await response.json()
         setState(prev => ({
           ...prev,
-          counts: data.counts,
-          recentActivity: data.recentActivity,
+          counts: data.counts ?? prev.counts,
+          recentActivity: data.recentActivity ?? [],
           loading: false,
           error: null,
         }))
-        setLastCheck(new Date(data.timestamp))
+        if (data.timestamp) setLastCheck(new Date(data.timestamp))
+      } else if (response.status === 401) {
+        // Not authenticated yet (e.g. on login screen) — stay quiet
+        setState(prev => ({ ...prev, loading: false, error: null }))
+      } else {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: 'Failed to fetch notifications',
+        }))
       }
-    } catch (error) {
+    } catch {
       setState(prev => ({
         ...prev,
         loading: false,

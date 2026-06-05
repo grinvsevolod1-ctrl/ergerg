@@ -16,22 +16,12 @@ import {
 import { queueCampaignProcessing, getQueueStats } from '@/lib/mailings/queue'
 import { verifyConnection } from '@/lib/mailings/sender'
 import { validateMailingConfig } from '@/lib/mailings/config'
-
-// Simple admin auth check (you should use proper auth in production)
-function isAdmin(req: NextRequest): boolean {
-  const adminToken = process.env.ADMIN_API_TOKEN
-  if (!adminToken) return false
-  
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return false
-  
-  return authHeader.slice(7) === adminToken
-}
+import { verifyAdminSession, unauthorizedResponse } from '@/lib/admin-auth'
 
 // GET - List campaigns
 export async function GET(req: NextRequest) {
-  if (!isAdmin(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await verifyAdminSession(req))) {
+    return unauthorizedResponse()
   }
 
   const { searchParams } = new URL(req.url)
@@ -54,8 +44,8 @@ export async function GET(req: NextRequest) {
 
 // POST - Create campaign or perform action
 export async function POST(req: NextRequest) {
-  if (!isAdmin(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await verifyAdminSession(req))) {
+    return unauthorizedResponse()
   }
 
   try {

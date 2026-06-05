@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getLeadWithChatSession, updateLeadStatus, deleteLeadData } from '@/lib/db/leads'
-
-// Verify admin token
-function verifyAdmin(request: NextRequest): boolean {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  const adminToken = process.env.ADMIN_API_TOKEN
-  return token === adminToken && !!adminToken
-}
+import { verifyAdminSession, unauthorizedResponse } from '@/lib/admin-auth'
 
 // GET /api/admin/leads/[id] - Get lead details
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!verifyAdmin(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await verifyAdminSession(request))) {
+    return unauthorizedResponse()
   }
 
   try {
@@ -40,8 +34,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!verifyAdmin(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await verifyAdminSession(request))) {
+    return unauthorizedResponse()
   }
 
   try {
@@ -71,8 +65,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!verifyAdmin(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(await verifyAdminSession(request))) {
+    return unauthorizedResponse()
   }
 
   try {
