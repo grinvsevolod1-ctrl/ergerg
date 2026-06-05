@@ -248,7 +248,7 @@ export async function routedChat(
   }
 ) {
   // Select server (prefer specified if healthy)
-  let server = options?.preferServer && AI_SERVERS[options.preferServer] 
+  const server = options?.preferServer && AI_SERVERS[options.preferServer] 
     ? options.preferServer 
     : selectServer()
   

@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { SignJWT } from 'jose'
 import bcrypt from 'bcryptjs'
 import { rateLimiters } from '@/lib/rate-limit'
-import { JWT_SECRET, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
+import { getJwtSecret, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
 
 export async function POST(request: NextRequest) {
   try {
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
       .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
       .setIssuedAt()
       .setExpirationTime(SESSION_CONFIG.expirationTime)
-      .sign(JWT_SECRET)
+      .sign(getJwtSecret())
 
     // Set single session cookie (matching auth service)
     const cookieStore = await cookies()

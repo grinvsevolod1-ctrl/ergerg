@@ -208,7 +208,7 @@ export async function searchGoogle(query: string, limit: number = 10): Promise<S
 // Combined search with fallback
 export async function searchSites(niche: string, limit: number = 10): Promise<SearchResult[]> {
   // Try Yandex first
-  let results = await searchYandex(niche, limit)
+  const results = await searchYandex(niche, limit)
   
   // Fallback to Google if Yandex returns nothing
   if (results.length < 3) {

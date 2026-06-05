@@ -3,7 +3,7 @@ import { rateLimiters } from '@/lib/rate-limit'
 import { query, execute } from '@/lib/db'
 import { SignJWT } from 'jose'
 import bcrypt from 'bcryptjs'
-import { JWT_SECRET, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
+import { getJwtSecret, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     await execute('DELETE FROM nexik_otp_codes WHERE email = $1', [email.toLowerCase()])
 
     // Check if user exists
-    let existingMember = await query<{ id: string; org_id: string; name: string }>(
+    const existingMember = await query<{ id: string; org_id: string; name: string }>(
       'SELECT id, org_id, name FROM nexik_org_members WHERE email = $1',
       [email.toLowerCase()]
     )
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
       .setIssuedAt()
       .setExpirationTime(SESSION_CONFIG.expirationTime)
-      .sign(JWT_SECRET)
+      .sign(getJwtSecret())
 
     // Set cookie
     const response = NextResponse.json({

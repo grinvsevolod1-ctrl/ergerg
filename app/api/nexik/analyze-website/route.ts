@@ -125,7 +125,7 @@ function extractBusinessName(html: string, url: string): string {
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
   if (titleMatch) {
     // Clean up title - remove common suffixes
-    let title = titleMatch[1]
+    const title = titleMatch[1]
       .replace(/\s*[-|–—]\s*.*$/, '') // Remove anything after - | – —
       .replace(/Главная\s*/i, '')
       .replace(/Home\s*/i, '')

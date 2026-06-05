@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { SignJWT } from 'jose'
-import { JWT_SECRET, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
+import { getJwtSecret, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
 import { query } from '@/lib/db'
 
 interface GoogleTokenResponse {
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
       .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
       .setIssuedAt()
       .setExpirationTime(SESSION_CONFIG.expirationTime)
-      .sign(JWT_SECRET)
+      .sign(getJwtSecret())
     
     // Set cookie
     const cookieStore = await cookies()

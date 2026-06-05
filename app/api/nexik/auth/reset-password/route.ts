@@ -3,7 +3,7 @@ import { jwtVerify, SignJWT } from 'jose'
 import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 import { rateLimiters } from '@/lib/rate-limit'
-import { JWT_SECRET, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
+import { getJwtSecret, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
 
 const BCRYPT_ROUNDS = 12
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     // Verify reset token
     let payload: { memberId: string; type: string }
     try {
-      const verified = await jwtVerify(token, JWT_SECRET)
+      const verified = await jwtVerify(token, getJwtSecret())
       payload = verified.payload as { memberId: string; type: string }
       
       if (payload.type !== 'password_reset') {
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
         .setIssuedAt()
         .setExpirationTime(SESSION_CONFIG.expirationTime)
-        .sign(JWT_SECRET)
+        .sign(getJwtSecret())
 
       const cookieStore = await cookies()
       cookieStore.set(SESSION_CONFIG.cookieName, sessionToken, {

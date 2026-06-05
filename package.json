@@ -13,7 +13,6 @@
     "db:init": "psql $DATABASE_URL -f scripts/init-db.sql",
     "db:reset": "psql $DATABASE_URL -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' && pnpm db:init",
     "setup": "chmod +x scripts/setup.sh && ./scripts/setup.sh",
-
     "worker": "tsx scripts/email-worker.ts"
   },
   "dependencies": {
@@ -84,6 +83,7 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@tailwindcss/postcss": "^4.1.9",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
@@ -97,6 +97,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.2",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.0.10",
     "jsdom": "^29.1.1",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",

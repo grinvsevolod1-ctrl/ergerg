@@ -198,7 +198,7 @@ export function replaceContent(html: string, userData: UserData): ReplaceResult 
     }
     
     // Update meta description
-    let $metaDesc = $('meta[name="description"]')
+    const $metaDesc = $('meta[name="description"]')
     if ($metaDesc.length === 0) {
       $('head').append(`<meta name="description" content="${userData.description}">`)
     } else {

@@ -1,20 +1,26 @@
 import CryptoJS from 'crypto-js'
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY
-if (!ENCRYPTION_KEY && process.env.NODE_ENV === 'production') {
-  throw new Error('ENCRYPTION_KEY environment variable is required in production')
+// Resolve the encryption key lazily at call time (not at module load).
+// Throwing at import time would crash the build/server before any request.
+function getEncryptionKey(): string {
+  const key = process.env.ENCRYPTION_KEY
+  if (!key) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_KEY environment variable is required in production')
+    }
+    return 'dev-key-not-for-production'
+  }
+  return key
 }
 
 // Encrypt sensitive data
 export function encrypt(text: string): string {
-  const key = ENCRYPTION_KEY || 'dev-key-not-for-production'
-  return CryptoJS.AES.encrypt(text, key).toString()
+  return CryptoJS.AES.encrypt(text, getEncryptionKey()).toString()
 }
 
 // Decrypt sensitive data
 export function decrypt(ciphertext: string): string {
-  const key = ENCRYPTION_KEY || 'dev-key-not-for-production'
-  const bytes = CryptoJS.AES.decrypt(ciphertext, key)
+  const bytes = CryptoJS.AES.decrypt(ciphertext, getEncryptionKey())
   return bytes.toString(CryptoJS.enc.Utf8)
 }
 
@@ -84,9 +90,16 @@ export function extractIP(request: Request): string {
 }
 
 // CORS validation
+// Allowed origins can be configured via the ALLOWED_ORIGINS env var
+// (comma-separated) so the project works on any deployment domain/VPS.
 export function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return false
+  const envOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
   const allowedOrigins = [
+    ...envOrigins,
     'https://netnext.site',
     'https://www.netnext.site',
     process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : '',

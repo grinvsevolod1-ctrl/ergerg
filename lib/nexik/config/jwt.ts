@@ -5,8 +5,15 @@
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
-// Get JWT secret - MUST be set in production
-function getJwtSecret(): Uint8Array {
+// Cache the encoded secret so we only validate/encode once per process.
+let cachedSecret: Uint8Array | null = null
+
+// Get JWT secret - MUST be set in production.
+// Evaluated lazily (on first use) instead of at import time, so that a missing
+// secret never crashes the build or server startup before a request is handled.
+export function getJwtSecret(): Uint8Array {
+  if (cachedSecret) return cachedSecret
+
   const secret = process.env.NEXIK_JWT_SECRET
   
   if (!secret) {
@@ -16,7 +23,8 @@ function getJwtSecret(): Uint8Array {
         '[Nexik JWT] Warning: NEXIK_JWT_SECRET not set. Using development fallback. ' +
         'DO NOT use this in production!'
       )
-      return new TextEncoder().encode('nexik-dev-only-secret-not-for-production')
+      cachedSecret = new TextEncoder().encode('nexik-dev-only-secret-not-for-production')
+      return cachedSecret
     }
     
     // In production, throw error - security requirement
@@ -33,11 +41,9 @@ function getJwtSecret(): Uint8Array {
     )
   }
   
-  return new TextEncoder().encode(secret)
+  cachedSecret = new TextEncoder().encode(secret)
+  return cachedSecret
 }
-
-// Export the secret (will be evaluated when first imported)
-export const JWT_SECRET = getJwtSecret()
 
 // Session configuration
 export const SESSION_CONFIG = {

@@ -203,7 +203,7 @@ export async function processMessage(request: ChatRequest): Promise<ChatResponse
   const memory = await getOrCreateVisitorMemory(request.org_id, request.visitor_id)
   
   // Extract facts from message and update memory
-  const extractedFacts = await extractFactsFromMessage(request.message)
+  const extractedFacts = await extractFactsFromMessage(request.message, memory.id, conversation.id)
   if (extractedFacts.length > 0 || request.visitor_info?.name || request.visitor_info?.email) {
     // Map sentiment label to allowed values (exclude 'urgent')
     const sentiment = sentimentResult.message.label
@@ -367,14 +367,16 @@ async function generateAIResponse(
   const ragUsed = !!ragContext
   
   // Build context using context-injection
-  const injectedContext = await buildContext({
+  const injectedContext = await buildContext(
     orgId,
-    visitorId: visitorId || conversation.visitor_id,
-    currentMessage: userMessage,
-    includeMemory: true,
-    includeKnowledge: true,
-    includePersonality: true
-  })
+    visitorId || conversation.visitor_id,
+    userMessage,
+    [],
+    {
+      includeMemory: true,
+      includeKnowledge: true
+    }
+  )
   
   // Use the full system prompt from context injection
   let systemPrompt = injectedContext.fullSystemPrompt

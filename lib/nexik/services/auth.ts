@@ -17,7 +17,7 @@ import {
   type OrgMember
 } from '../db/organizations'
 import { createWidget } from '../db/widgets'
-import { JWT_SECRET, SESSION_CONFIG } from '../config/jwt'
+import { getJwtSecret, SESSION_CONFIG } from '../config/jwt'
 
 const BCRYPT_ROUNDS = 12 // Secure default for production
 
@@ -48,12 +48,12 @@ async function createSessionToken(payload: SessionPayload): Promise<string> {
     .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
     .setIssuedAt()
     .setExpirationTime(SESSION_CONFIG.expirationTime)
-    .sign(JWT_SECRET)
+    .sign(getJwtSecret())
 }
 
 async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const { payload } = await jwtVerify(token, getJwtSecret())
     return payload as unknown as SessionPayload
   } catch {
     return null

@@ -4,7 +4,7 @@ import { v4 as uuid } from 'uuid'
 import bcrypt from 'bcryptjs'
 import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
-import { JWT_SECRET, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
+import { getJwtSecret, SESSION_CONFIG } from '@/lib/nexik/config/jwt'
 
 const BCRYPT_ROUNDS = 12
 
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         .setProtectedHeader({ alg: SESSION_CONFIG.algorithm })
         .setIssuedAt()
         .setExpirationTime(SESSION_CONFIG.expirationTime)
-        .sign(JWT_SECRET)
+        .sign(getJwtSecret())
 
       const cookieStore = await cookies()
       cookieStore.set(SESSION_CONFIG.cookieName, token, {
