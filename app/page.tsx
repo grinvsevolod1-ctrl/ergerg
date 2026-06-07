@@ -15,6 +15,7 @@ import { TeamSection } from "@/components/sections/team-section"
 import { ContactSection } from "@/components/sections/contact-section"
 import { Footer } from "@/components/footer"
 import { FloatingCTA } from "@/components/floating-cta"
+import { LandingPromoToast } from "@/components/landing-promo-toast"
 import { AIOrbCanvas } from "@/components/ai-orb"
 import { NetNextChat } from "@/components/chat/netnext-chat"
 
@@ -96,6 +97,7 @@ export default function Home() {
 
       {showContent && <CookieConsent />}
       {showContent && <FloatingCTA />}
+      {showContent && <LandingPromoToast />}
 
       <main
         ref={mainRef}

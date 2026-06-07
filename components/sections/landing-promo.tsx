@@ -44,8 +44,9 @@ export function LandingPromo({ onOpenChat }: LandingPromoProps) {
 
   return (
     <section
+      id="landing"
       aria-labelledby="promo-landing-title"
-      className="relative px-4 sm:px-6 md:px-8 lg:px-20 pt-4 pb-12 md:pt-8 md:pb-20"
+      className="relative scroll-mt-24 md:scroll-mt-16 px-4 sm:px-6 md:px-8 lg:px-20 pt-4 pb-12 md:pt-8 md:pb-20"
     >
       <motion.div
         ref={ref}
