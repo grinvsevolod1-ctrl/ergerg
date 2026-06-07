@@ -7,45 +7,67 @@ interface NexikCharacterProps {
   className?: string
 }
 
+/** Intrinsic dimensions of the source clip (used to reserve space → zero layout shift). */
+const VIDEO_W = 1108
+const VIDEO_H = 732
+
 /**
  * Animated Nexik mascot for the hero.
  *
- * The source is an mp4 on a pure-black background. We never expose it as a
+ * The source is an mp4 on a pure-black background. It is never presented as a
  * "video": no controls, no chrome, pointer-events disabled, and
  * `mix-blend-mode: screen` makes the black background fully transparent so the
  * character appears to float natively inside the hero. The clip plays once
- * (the mascot walks in and settles) and holds the final rest pose.
+ * (the mascot walks in and settles) and holds its final rest pose.
+ *
+ * Loading is engineered for slow connections:
+ * - The container reserves the exact aspect ratio, so there is **no layout
+ *   shift** (CLS) whether the video arrives in 50ms or 5s.
+ * - The element stays fully transparent until the first frame is decoded, then
+ *   fades in — so users never see a half-loaded or popping video.
+ * - `prefers-reduced-motion` skips the walk-in and shows the rest pose.
+ * - If the video fails to load, the element stays invisible (it is decorative).
  */
 export function NexikCharacter({ className }: NexikCharacterProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [ready, setReady] = useState(false)
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading")
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
-    // Respect reduced-motion: jump straight to the rest pose, no walk-in.
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
     const handleReady = () => {
-      setReady(true)
+      setStatus("ready")
       if (prefersReduced) {
-        video.currentTime = video.duration || 0
+        // Jump straight to the settled pose, no walk-in.
+        try {
+          video.currentTime = video.duration || 0
+        } catch {
+          /* duration may not be known yet; harmless */
+        }
         return
       }
-      video.play().catch(() => {
-        // Autoplay can be blocked; the static last frame still looks correct.
-        setReady(true)
+      void video.play().catch(() => {
+        // Autoplay can be blocked (rare for muted+playsInline). The first frame
+        // is already painted, so the hero still looks intact.
       })
     }
+
+    const handleError = () => setStatus("error")
 
     if (video.readyState >= 2) {
       handleReady()
     } else {
       video.addEventListener("loadeddata", handleReady, { once: true })
+      video.addEventListener("error", handleError, { once: true })
     }
 
-    return () => video.removeEventListener("loadeddata", handleReady)
+    return () => {
+      video.removeEventListener("loadeddata", handleReady)
+      video.removeEventListener("error", handleError)
+    }
   }, [])
 
   return (
@@ -56,11 +78,10 @@ export function NexikCharacter({ className }: NexikCharacterProps) {
       )}
       aria-hidden="true"
     >
+      {/* Aspect-ratio box reserves the exact space up-front → no layout shift. */}
       <div
-        className={cn(
-          "relative w-full transition-opacity duration-700 ease-out",
-          ready ? "opacity-100" : "opacity-0",
-        )}
+        className="relative w-full"
+        style={{ aspectRatio: `${VIDEO_W} / ${VIDEO_H}` }}
       >
         <video
           ref={videoRef}
@@ -73,7 +94,11 @@ export function NexikCharacter({ className }: NexikCharacterProps) {
           disableRemotePlayback
           controls={false}
           tabIndex={-1}
-          className="block w-full h-auto [mix-blend-mode:screen] [transform:translateZ(0)]"
+          className={cn(
+            "absolute inset-0 h-full w-full object-contain [mix-blend-mode:screen] [transform:translateZ(0)]",
+            "transition-opacity duration-700 ease-out",
+            status === "ready" ? "opacity-100" : "opacity-0",
+          )}
         />
       </div>
     </div>

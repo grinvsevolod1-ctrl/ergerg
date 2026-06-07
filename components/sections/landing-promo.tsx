@@ -12,7 +12,7 @@
 
 import { useRef } from "react"
 import { motion, useInView } from "framer-motion"
-import { ArrowRight, Check, Sparkles, Clock, Zap } from "lucide-react"
+import { ArrowRight, Check, Clock, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { reachGoal, YM_GOALS } from "@/lib/analytics"
 
@@ -91,7 +91,6 @@ export function LandingPromo({ onOpenChat }: LandingPromoProps) {
                   <span className="text-xs sm:text-sm font-semibold text-primary tracking-wide">
                     Акция месяца
                   </span>
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
                 </div>
 
                 <h2
@@ -164,7 +163,6 @@ export function LandingPromo({ onOpenChat }: LandingPromoProps) {
 
                   {/* Бейдж выгоды */}
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#ff6b35]/15 border border-[#ff6b35]/25 text-xs font-semibold text-[#ff6b35] mb-5">
-                    <Sparkles className="w-3 h-3" />
                     Выгода 50%
                   </div>
 

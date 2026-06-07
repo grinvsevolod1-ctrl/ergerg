@@ -57,13 +57,15 @@ export function HeroSection({ onNavigate }: HeroSectionProps) {
       style={{ backgroundColor: "#040609" }}
       className="min-h-[100svh] flex items-center justify-center relative overflow-hidden pt-24 pb-20 md:pt-0 md:pb-0"
     >
-      {/* Soft green ambient glow on the LEFT only; right side stays a clean #040609 so the video edges stay invisible */}
+      {/* Soft green ambient glow on the LEFT only (desktop/tablet ≥lg). Hidden on
+          mobile so it never bleeds onto the video. ~15% smaller and pushed further
+          left so it can't reach the video and reveal its frame on the right. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0"
+        className="pointer-events-none absolute inset-0 z-0 hidden lg:block"
         style={{
           background:
-            "radial-gradient(70% 90% at 12% 48%, rgba(45, 212, 191, 0.14) 0%, rgba(16, 185, 129, 0.07) 38%, rgba(4, 6, 9, 0) 70%)",
+            "radial-gradient(59.5% 76.5% at 9% 48%, rgba(45, 212, 191, 0.14) 0%, rgba(16, 185, 129, 0.07) 38%, rgba(4, 6, 9, 0) 70%)",
         }}
       />
 

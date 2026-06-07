@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { 
   Mail, Phone, CheckCircle, ArrowRight, MessageSquare, Briefcase, Rocket, Clock, 
   SendHorizonal, AlertCircle, Palette, FileImage, Zap, Search, Plug, CreditCard,
-  Sparkles, X
+  X
 } from "lucide-react"
 import { CreativeIcon, LaunchIcon } from "@/components/icons"
 import { Button } from "@/components/ui/button"
@@ -67,7 +67,7 @@ const businessTemplates: Record<string, (business: string) => string> = {
   "магазин электроники": (b) => `Магазин электроники "${b}".\n\nНужно:\n- Каталог с характеристиками\n- Сравнение товаров\n- Кредит/рассрочка\n- Гарантия и сервис\n- Интеграция с 1С`,
   
   // Real Estate
-  "недвижимость": (b) => `Сайт агентства "${b}".\n\nФункционал:\n- Каталог объектов с фильтрами\n- Интерактивная ��арта\n- 3D-туры и планировки\n- Калькулятор ипотеки\n- Заявка на просмотр\n- CRM для риелторов`,
+  "недвижимос��ь": (b) => `Сайт агентства "${b}".\n\nФункционал:\n- Каталог объектов с фильтрами\n- Интерактивная ��арта\n- 3D-туры и планировки\n- Калькулятор ипотеки\n- Заявка на просмотр\n- CRM для риелторов`,
   "застройщик": (b) => `Сайт застройщика "${b}".\n\nТребуется:\n- Каталог ЖК и квартир\n- Планировки и цены\n- Ход строительства\n- Калькулятор ипотеки\n- 3D-визуализация\n- Бронирование онлайн`,
   "аренда": (b) => `Сервис аренды "${b}".\n\nФункционал:\n- Каталог объектов\n- Фильтры и карта\n- Онлайн-бронирование\n- Отзывы арендаторов\n- Личный кабинет`,
   
@@ -78,7 +78,7 @@ const businessTemplates: Record<string, (business: string) => string> = {
   "страхование": (b) => `Сайт страхования "${b}".\n\nТребуется:\n- Виды страхования\n- Онлайн-калькулятор\n- Оформление полиса онлайн\n- Личный кабинет\n- Подача заявления о страховом случае`,
   
   // IT & Tech
-  "it-компания": (b) => `Сайт IT-компании "${b}".\n\nФункционал:\n- Портфолио проектов\n- Описание технологий и стека\n- Команда и экспертиза\n- Блог с техническими статьями\n- Форма заявки на проект\n- Интеграция с GitHub\n\nДизайн: современный, технологичный.`,
+  "it-компания": (b) => `Сайт IT-компании "${b}".\n\nФункционал:\n- Портфолио проектов\n- Описание технологий и стека\n- Команда и экспертиза\n- Блог с т��хническими статьями\n- Форма заявки на проект\n- Интеграция с GitHub\n\nДизайн: современный, технологичный.`,
   "стартап": (b) => `Лендинг для стартапа "${b}".\n\nНужно:\n- Описание продукта\n- Преимущества и фичи\n- Демо/видео\n- Цены и тарифы\n- Форма регистрации\n- Инвесторам`,
   "saas": (b) => `Сайт SaaS-продукта "${b}".\n\nТребуется:\n- Описание возможностей\n- Тарифы и цены\n- Демо и free trial\n- Интеграции\n- База знаний\n- Личный кабинет`,
   
@@ -150,7 +150,7 @@ const quickActions = [
   { id: "figma", label: "Есть макеты", icon: FileImage, text: "\n\nДополнительно: есть готовые макеты в Figma.", color: "#3b82f6" },
   { id: "urgent", label: "Срочно", icon: Zap, text: "\n\nДополнительно: проект срочный, нужно быстро!", color: "#f59e0b" },
   { id: "seo", label: "SEO важно", icon: Search, text: "\n\nДополнительно: важна SEO-оптимизация с первого дня.", color: "#10b981" },
-  { id: "crm", label: "CRM интеграция", icon: Plug, text: "\n\nДополнительно: нужна интеграция с CRM (Bitrix/AmoCRM).", color: "#8b5cf6" },
+  { id: "crm", label: "CRM интеграция", icon: Plug, text: "\n\nДополнительн��: нужна интеграция с CRM (Bitrix/AmoCRM).", color: "#8b5cf6" },
   { id: "payment", label: "Онлайн-оплата", icon: CreditCard, text: "\n\nДополнительно: подключение онлайн-оплаты обязательно.", color: "#06b6d4" },
 ]
 
@@ -582,7 +582,6 @@ export function ContactSection() {
                     className="mb-4 p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-primary" />
                       <span className="text-sm text-primary font-medium">
                         Проект: {businessFromWidget}
                       </span>
