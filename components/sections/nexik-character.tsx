@@ -56,27 +56,15 @@ export function NexikCharacter({ className }: NexikCharacterProps) {
       )}
       aria-hidden="true"
     >
-      {/* Ambient glow grounding the character into the hero */}
-      <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[42%] w-[78%] aspect-square rounded-full blur-3xl opacity-60"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(79,209,197,0.20) 0%, rgba(99,179,237,0.12) 45%, transparent 70%)",
-        }}
-      />
-
-      {/* Soft floor reflection / shadow */}
-      <div className="absolute bottom-[6%] left-1/2 -translate-x-1/2 w-[55%] h-6 rounded-[100%] bg-primary/15 blur-xl" />
-
       <div
         className={cn(
-          "relative w-full transition-all duration-700 ease-out will-change-transform",
-          ready ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4",
+          "relative w-full transition-opacity duration-700 ease-out",
+          ready ? "opacity-100" : "opacity-0",
         )}
       >
         <video
           ref={videoRef}
-          src="/videos/hero-nexik.mp4"
+          src="/videos/hero-nexik-cut.mp4"
           muted
           playsInline
           autoPlay
@@ -85,7 +73,7 @@ export function NexikCharacter({ className }: NexikCharacterProps) {
           disableRemotePlayback
           controls={false}
           tabIndex={-1}
-          className="w-full h-auto [mix-blend-mode:screen] [transform:translateZ(0)] motion-safe:animate-[nexik-float_6s_ease-in-out_infinite]"
+          className="block w-full h-auto [mix-blend-mode:screen] [transform:translateZ(0)]"
         />
       </div>
     </div>

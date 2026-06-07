@@ -57,11 +57,6 @@ export function HeroSection({ onNavigate }: HeroSectionProps) {
       style={{ backgroundColor: "#040609" }}
       className="min-h-[100svh] flex items-center justify-center relative overflow-hidden pt-24 pb-20 md:pt-0 md:pb-0"
     >
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-48 sm:w-64 md:w-80 lg:w-96 h-48 sm:h-64 md:h-80 lg:h-96 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-40 sm:w-56 md:w-72 lg:w-80 h-40 sm:h-56 md:h-72 lg:h-80 bg-accent/5 rounded-full blur-3xl" />
-      </div>
-
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-20 relative z-10">
         <div className="grid lg:grid-cols-2 items-center gap-8 lg:gap-12 max-w-6xl mx-auto">
           {/* Character — appears first on mobile (above text), right column on desktop */}
