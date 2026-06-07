@@ -27,7 +27,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { NexikLogo } from "@/components/nexik/logo"
+import { SiriOrb } from "@/components/ai-orb"
 
 type Role = "user" | "assistant" | "operator" | "system"
 type Status = "sending" | "sent" | "error"
@@ -381,17 +381,19 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
             )}
           >
             {/* Header */}
-            <header className="relative flex items-center justify-between gap-3 px-5 py-4 border-b border-border">
+            <header className="relative flex items-center justify-between gap-3 px-4 md:px-5 py-3.5 md:py-4 border-b border-border bg-gradient-to-b from-secondary/40 to-transparent">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative shrink-0">
+                  {/* soft glow behind the real Nexik orb (same as preloader) */}
                   <div
-                    className="absolute inset-0 rounded-2xl blur-md opacity-60"
-                    style={{ background: "var(--glow)" }}
+                    className="absolute inset-[-6px] rounded-full blur-md opacity-70 pointer-events-none"
+                    style={{
+                      background:
+                        "radial-gradient(circle, rgba(79,209,197,0.45) 0%, rgba(99,179,237,0.2) 50%, transparent 72%)",
+                    }}
                     aria-hidden="true"
                   />
-                  <div className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-secondary">
-                    <NexikLogo size={30} animated />
-                  </div>
+                  <SiriOrb size={44} isActive={operatorConnected} />
                   <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5">
                     <span
                       className={cn(
@@ -408,10 +410,22 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
                   </span>
                 </div>
                 <div className="min-w-0">
-                  <h2 className="font-semibold text-foreground leading-tight truncate">
+                  <h2 className="font-semibold text-foreground leading-tight truncate flex items-center gap-2">
                     {operatorConnected ? "Оператор NetNext" : "Nexik"}
+                    {!operatorConnected && (
+                      <span className="hidden sm:inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        AI
+                      </span>
+                    )}
                   </h2>
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "inline-block h-1.5 w-1.5 rounded-full",
+                        operatorConnected ? "bg-chart-4" : isTyping ? "bg-primary animate-pulse" : "bg-primary",
+                      )}
+                      aria-hidden="true"
+                    />
                     {operatorConnected
                       ? "Живой оператор на связи"
                       : isTyping
@@ -460,12 +474,12 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
             </AnimatePresence>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+            <div className="flex-1 overflow-y-auto px-3 md:px-4 py-4 space-y-3 [scrollbar-width:thin]">
               {messages.map((msg) => {
                 if (msg.role === "system") {
                   return (
-                    <div key={msg.id} className="flex justify-center">
-                      <span className="text-xs text-muted-foreground bg-secondary/60 px-3 py-1.5 rounded-full text-center">
+                    <div key={msg.id} className="flex justify-center py-0.5">
+                      <span className="text-xs text-muted-foreground bg-secondary/60 px-3 py-1.5 rounded-full text-center max-w-[90%]">
                         {msg.content}
                       </span>
                     </div>
@@ -473,27 +487,39 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
                 }
                 const isUser = msg.role === "user"
                 const isOperator = msg.role === "operator"
+                const showAvatar = !isUser
                 return (
                   <motion.div
                     key={msg.id}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={cn("flex", isUser ? "justify-end" : "justify-start")}
+                    className={cn("flex items-end gap-2", isUser ? "justify-end" : "justify-start")}
                   >
-                    <div className="max-w-[85%]">
+                    {showAvatar && (
+                      <div className="shrink-0 mb-0.5" aria-hidden="true">
+                        {isOperator ? (
+                          <span className="flex items-center justify-center h-7 w-7 rounded-full bg-chart-4/15 text-chart-4">
+                            <Headphones className="h-3.5 w-3.5" />
+                          </span>
+                        ) : (
+                          <SiriOrb size={28} />
+                        )}
+                      </div>
+                    )}
+                    <div className={cn("max-w-[80%]", isUser && "items-end")}>
                       {isOperator && (
                         <span className="block mb-1 text-[10px] font-medium text-chart-4 px-1">
-                          Оператор
+                          Оператор NetNext
                         </span>
                       )}
                       <div
                         className={cn(
-                          "px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words",
+                          "px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm",
                           isUser
-                            ? "bg-primary text-primary-foreground rounded-br-md"
+                            ? "bg-primary text-primary-foreground rounded-br-sm"
                             : isOperator
-                              ? "bg-chart-4/15 text-foreground rounded-bl-md border border-chart-4/20"
-                              : "bg-secondary text-secondary-foreground rounded-bl-md",
+                              ? "bg-chart-4/10 text-foreground rounded-bl-sm border border-chart-4/20"
+                              : "bg-secondary text-secondary-foreground rounded-bl-sm",
                         )}
                       >
                         {msg.content}
@@ -516,8 +542,11 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
 
               {/* Typing indicator */}
               {isTyping && (
-                <div className="flex justify-start">
-                  <div className="bg-secondary px-4 py-3 rounded-2xl rounded-bl-md">
+                <div className="flex items-end gap-2 justify-start">
+                  <div className="shrink-0 mb-0.5" aria-hidden="true">
+                    <SiriOrb size={28} />
+                  </div>
+                  <div className="bg-secondary px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm">
                     <div className="flex items-center gap-1">
                       {[0, 150, 300].map((d) => (
                         <span
@@ -533,7 +562,11 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
 
               {/* Quick actions */}
               {showQuickActions && (
-                <div className="flex flex-wrap gap-2 pt-1">
+                <div className="flex flex-col gap-2 pt-1 pl-9">
+                  <span className="text-[11px] font-medium text-muted-foreground px-1">
+                    Популярные вопросы
+                  </span>
+                  <div className="flex flex-wrap gap-2">
                   {QUICK_ACTIONS.map((qa) => {
                     const Icon = qa.icon
                     return (
@@ -548,6 +581,7 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
                       </button>
                     )
                   })}
+                  </div>
                 </div>
               )}
 
