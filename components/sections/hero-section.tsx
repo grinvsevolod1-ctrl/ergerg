@@ -57,15 +57,26 @@ export function HeroSection({ onNavigate }: HeroSectionProps) {
       style={{ backgroundColor: "#040609" }}
       className="min-h-[100svh] flex items-center justify-center relative overflow-hidden pt-24 pb-20 md:pt-0 md:pb-0"
     >
+      {/* Soft green ambient glow on the LEFT only; right side stays a clean #040609 so the video edges stay invisible */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{
+          background:
+            "radial-gradient(70% 90% at 12% 48%, rgba(45, 212, 191, 0.14) 0%, rgba(16, 185, 129, 0.07) 38%, rgba(4, 6, 9, 0) 70%)",
+        }}
+      />
+
       <div className="container mx-auto px-4 sm:px-6 md:px-8 lg:px-20 relative z-10">
         <div className="grid lg:grid-cols-2 items-center gap-8 lg:gap-12 max-w-6xl mx-auto">
-          {/* Character — appears first on mobile (above text), right column on desktop */}
-          <div className="order-1 lg:order-2 flex justify-center lg:justify-end">
-            <NexikCharacter className="w-[230px] sm:w-[300px] md:w-[360px] lg:w-full lg:max-w-[520px]" />
+          {/* Character — appears first on mobile (above text), right column on desktop.
+              z-0 keeps it BELOW the text/buttons so any overflow never covers the UI. */}
+          <div className="order-1 lg:order-2 relative z-0 flex justify-center lg:justify-end">
+            <NexikCharacter className="w-[270px] sm:w-[350px] md:w-[420px] lg:w-full lg:max-w-[610px]" />
           </div>
 
-          {/* Text content */}
-          <div className="order-2 lg:order-1 flex flex-col items-center text-center lg:items-start lg:text-left">
+          {/* Text content — z-20 keeps it ABOVE the enlarged video at all times */}
+          <div className="order-2 lg:order-1 relative z-20 flex flex-col items-center text-center lg:items-start lg:text-left">
             <h1 className="text-[2rem] leading-[1.15] sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-bold mb-5 sm:mb-6 text-balance tracking-tight">
               <span className="text-foreground">Мы создаём</span>
               <br />
