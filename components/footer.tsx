@@ -16,7 +16,7 @@ const footerLinks = {
     { label: "Условия использования", href: "/terms" },
   ],
   social: [
-    { label: "Telegram", href: "https://t.me/netnextadminbot", icon: TelegramIcon, color: "#0088cc" },
+    { label: "Telegram", href: "https://t.me/netnext_team", icon: TelegramIcon, color: "#0088cc" },
     { label: "WhatsApp", href: "https://wa.me/375291414555", icon: WhatsAppIcon, color: "#25D366" },
     { label: "Viber", href: "viber://chat?number=%2B375291414555", icon: ViberIcon, color: "#7360F2" },
     { label: "Instagram", href: "https://instagram.com/netnext.site", icon: InstagramIcon, color: "#E4405F" },

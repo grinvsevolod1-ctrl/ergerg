@@ -36,7 +36,7 @@ const contactInfo = {
   phone: "+375 (29) 14-14-555",
   phoneHref: "tel:+375291414555",
   email: "hello@netnext.site",
-  telegram: "https://t.me/netnextadminbot",
+  telegram: "https://t.me/netnext_team",
   whatsapp: "https://wa.me/375291414555",
   viber: "viber://chat?number=%2B375291414555",
 }

@@ -78,7 +78,7 @@ const businessTemplates: Record<string, (business: string) => string> = {
   "страхование": (b) => `Сайт страхования "${b}".\n\nТребуется:\n- Виды страхования\n- Онлайн-калькулятор\n- Оформление полиса онлайн\n- Личный кабинет\n- Подача заявления о страховом случае`,
   
   // IT & Tech
-  "it-компания": (b) => `Сайт IT-компании "${b}".\n\nФункционал:\n- Портфолио проектов\n- Описание технологий и стека\n- Команда и экспертиза\n- Блог с т����ническими статьями\n- Форма заявки на проект\n- Интеграция с GitHub\n\nДизайн: современный, технологичный.`,
+  "it-компания": (b) => `Сайт IT-компании "${b}".\n\nФункционал:\n- Портфолио проектов\n- Описание технологий и стека\n- Команда и экспертиза\n- Блог с т������ническими статьями\n- Форма заявки на проект\n- Интеграция с GitHub\n\nДизайн: современный, технологичный.`,
   "стартап": (b) => `Лендинг для стартапа "${b}".\n\nНужно:\n- Описание продукта\n- Преимущества и фичи\n- Демо/видео\n- Цены и тарифы\n- Форма регистрации\n- Инвесторам`,
   "saas": (b) => `Сайт SaaS-продукта "${b}".\n\nТребуется:\n- Описание возможностей\n- Тарифы и цены\n- Демо и free trial\n- Интеграции\n- База знаний\n- Личный кабинет`,
   
@@ -150,7 +150,7 @@ const quickActions = [
   { id: "figma", label: "Есть макеты", icon: FileImage, text: "\n\nДополнительно: есть готовые макеты в Figma.", color: "#3b82f6" },
   { id: "urgent", label: "Срочно", icon: Zap, text: "\n\nДополнительно: проект срочный, нужно быстро!", color: "#f59e0b" },
   { id: "seo", label: "SEO важно", icon: Search, text: "\n\nДополнительно: важна SEO-оптимизация с первого дня.", color: "#10b981" },
-  { id: "crm", label: "CRM интеграция", icon: Plug, text: "\n\nДополните��ьн��: нужна интеграция с CRM (Bitrix/AmoCRM).", color: "#8b5cf6" },
+  { id: "crm", label: "CRM интеграция", icon: Plug, text: "\n\nДополните����ьн��: нужна интеграция с CRM (Bitrix/AmoCRM).", color: "#8b5cf6" },
   { id: "payment", label: "Онлайн-оплата", icon: CreditCard, text: "\n\nДополнительно: подключение онлайн-оплаты обязательно.", color: "#06b6d4" },
 ]
 
@@ -161,7 +161,7 @@ const contactCards = [
 ]
 
 const messengerLinks = [
-  { icon: TelegramIcon, label: "Telegram", href: "https://t.me/netnextadminbot", color: "#0088cc" },
+  { icon: TelegramIcon, label: "Telegram", href: "https://t.me/netnext_team", color: "#0088cc" },
   { icon: WhatsAppIcon, label: "WhatsApp", href: "https://wa.me/375291414555", color: "#25D366" },
   { icon: ViberIcon, label: "Viber", href: "viber://chat?number=%2B375291414555", color: "#7360F2" },
 ]

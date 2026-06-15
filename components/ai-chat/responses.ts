@@ -130,7 +130,7 @@ export const responses: Record<string, ResponseData> = {
 
   // -- Contact --
   contact: {
-    text: "Связаться с нами:\n\n**Телефон:** +375 (29) 14-14-555\n**Email:** hello@netnext.site\n**Telegram:** @netnextadminbot\n**WhatsApp:** +375 (29) 14-14-555\n**Viber:** +375 (29) 14-14-555\n\nИли заполните форму заявки на сайте — ответим в течение 15 минут в рабочее время.",
+    text: "Связаться с нами:\n\n**Телефон:** +375 (29) 14-14-555\n**Email:** hello@netnext.site\n**Telegram:** @netnext_team\n**WhatsApp:** +375 (29) 14-14-555\n**Viber:** +375 (29) 14-14-555\n\nИли заполните форму заявки на сайте — ответим в течение 15 минут в рабочее время.",
     buttons: [
       { label: "Заполнить заявку", action: "start_project" },
       { label: "Вернуться в начало", action: "default" },

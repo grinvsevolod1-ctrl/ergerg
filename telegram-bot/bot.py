@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NetNext Telegram Bot (@netnextadminbot)
+NetNext Telegram Bot (@netnext_team)
 =======================================
 Relay bot: users message the bot -> owner gets forwarded message ->
 owner replies -> bot sends reply back to the user.

@@ -153,7 +153,7 @@ export default function RootLayout({
                     "availableLanguage": ["Russian", "English"]
                   },
                   "sameAs": [
-                    "https://t.me/netnextadminbot"
+                    "https://t.me/netnext_team"
                   ],
                   "areaServed": {
                     "@type": "Country",

@@ -213,7 +213,7 @@ export async function initializeDefaultKnowledge(): Promise<void> {
     },
     {
       question: 'Как с вами связаться?',
-      answer: 'Телефон: +375 (29) 14-14-555, Email: hello@netnext.site, Telegram: @netnextadminbot. Также можете оставить заявку на сайте — ответим в течение 15 минут в рабочее время.',
+      answer: 'Телефон: +375 (29) 14-14-555, Email: hello@netnext.site, Telegram: @netnext_team. Также можете оставить заявку на сайте — ответим в течение 15 минут в рабочее время.',
       category: 'Контакты',
     },
     {

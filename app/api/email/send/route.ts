@@ -178,7 +178,7 @@ function buildEmailHTML(name: string, projectType: string): string {
                     <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td align="center">
-                          <a href="https://t.me/netnextadminbot" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#14b8a6,#0ea5e9);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:12px;letter-spacing:0.2px;">
+                          <a href="https://t.me/netnext_team" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#14b8a6,#0ea5e9);color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:12px;letter-spacing:0.2px;">
                             Написать в Telegram
                           </a>
                         </td>

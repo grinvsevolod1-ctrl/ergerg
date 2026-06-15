@@ -22,5 +22,5 @@ NetNext — команда, которая проектирует, разраб�
 ## Контакты
 
 - Email: hello@netnext.site
-- Telegram: https://t.me/netnextadminbot
+- Telegram: https://t.me/netnext_team
 - Адрес: г. Минск, ул. Фабрициуса 9, пом. 1 (кабинет 31), 220007, Беларусь
