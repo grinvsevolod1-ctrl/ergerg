@@ -33,10 +33,10 @@ export type ProjectType =
   | 'other'
 
 export type BudgetRange = 
-  | 'small'      // до 3 000 Br
-  | 'medium'     // 3 000 - 10 000 Br
-  | 'large'      // 10 000 - 30 000 Br
-  | 'enterprise' // 30 000+ Br
+  | 'small'      // до 3 000 BYN
+  | 'medium'     // 3 000 - 10 000 BYN
+  | 'large'      // 10 000 - 30 000 BYN
+  | 'enterprise' // 30 000+ BYN
 
 export type LeadStatus = 
   | 'new'
@@ -59,10 +59,10 @@ export const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
 }
 
 export const BUDGET_RANGE_LABELS: Record<BudgetRange, string> = {
-  small: 'до 3 000 Br',
-  medium: '3 000 - 10 000 Br',
-  large: '10 000 - 30 000 Br',
-  enterprise: '30 000+ Br',
+  small: 'до 3 000 BYN',
+  medium: '3 000 - 10 000 BYN',
+  large: '10 000 - 30 000 BYN',
+  enterprise: '30 000+ BYN',
 }
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {

@@ -10,7 +10,7 @@ const services = [
     icon: <Megaphone className="w-5 h-5 md:w-6 md:h-6" />,
     title: "Контекстная реклама",
     subtitle: "Яндекс Директ и Google Ads",
-    description: "Настраиваем и ведём рекламные кампании с бюджетами от 10 тыс. до 1+ млн Br. Более 10 крупных клиентов.",
+    description: "Настраиваем и ведём рекламные кампании с бюджетами от 10 тыс. до 1+ млн BYN. Более 10 крупных клиентов.",
     features: ["Яндекс Директ", "Google Ads", "Аналитика ROI", "A/B тесты"],
     accent: "#ff6b35",
     highlighted: true,

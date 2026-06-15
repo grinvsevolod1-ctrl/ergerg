@@ -17,10 +17,10 @@ interface ContactLeadBody {
 }
 
 const budgetLabels: Record<string, string> = {
-  small: 'до 3 000 Br',
-  medium: '3 000 - 10 000 Br',
-  large: '10 000 - 30 000 Br',
-  enterprise: '30 000+ Br',
+  small: 'до 3 000 BYN',
+  medium: '3 000 - 10 000 BYN',
+  large: '10 000 - 30 000 BYN',
+  enterprise: '30 000+ BYN',
 }
 
 const projectLabels: Record<string, string> = {

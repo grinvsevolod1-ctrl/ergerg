@@ -65,7 +65,7 @@ describe('Knowledge Base', () => {
   describe('search', () => {
     beforeEach(async () => {
       await addFAQs(testClientId, [
-        { question: 'What is your pricing?', answer: 'Starting from 2500 Br for a landing page.', category: 'Pricing' },
+        { question: 'What is your pricing?', answer: 'Starting from 2500 BYN for a landing page.', category: 'Pricing' },
         { question: 'How long does development take?', answer: 'A landing page takes 1-2 weeks.', category: 'Timeline' },
         { question: 'What technologies do you use?', answer: 'React, Next.js, TypeScript, Tailwind.', category: 'Tech' },
       ])
@@ -91,7 +91,7 @@ describe('Knowledge Base', () => {
   describe('getRAGContext', () => {
     beforeEach(async () => {
       await addFAQs(testClientId, [
-        { question: 'What is your pricing?', answer: 'Starting from 2500 Br.', category: 'Pricing' },
+        { question: 'What is your pricing?', answer: 'Starting from 2500 BYN.', category: 'Pricing' },
       ])
     })
 

@@ -36,7 +36,7 @@ function getSiteBaseUrl(): string {
   return (
     process.env.NEXT_PUBLIC_SITE_URL ||
     process.env.NEXT_PUBLIC_BASE_URL ||
-    'https://netnext.org'
+    'https://netnext.site'
   ).replace(/\/$/, '')
 }
 
@@ -96,14 +96,14 @@ export async function POST(request: NextRequest) {
     const message = `${header}
 
 👤 <b>Посетитель:</b> ${visitorName || sessionId}
-📍 <b>Страница:</b> ${currentPage || 'netnext.org'}
+📍 <b>Страница:</b> ${currentPage || 'netnext.site'}
 🆔 <b>Сессия:</b> <code>${sessionId}</code>
 ${contactInfo ? `\n<b>Контакты:</b>\n${contactInfo}` : ''}
 
 💬 <b>Последние сообщения:</b>
 <code>${conversationSummary || 'пока нет сообщений'}</code>
 
-⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' })}`
+⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Minsk' })}`
 
     const { botToken, chatId, isWebhookBot } = getTelegramConfig()
     const baseUrl = getSiteBaseUrl()
@@ -150,18 +150,18 @@ ${contactInfo ? `\n<b>Контакты:</b>\n${contactInfo}` : ''}
 // Проверка доступности оператора (рабочие часы).
 export async function GET() {
   const now = new Date()
-  const almatyHour = parseInt(
-    now.toLocaleString('en-US', { timeZone: 'Asia/Almaty', hour: 'numeric', hour12: false }),
+  const minskHour = parseInt(
+    now.toLocaleString('en-US', { timeZone: 'Europe/Minsk', hour: 'numeric', hour12: false }),
   )
 
-  const isWorkingHours = almatyHour >= 10 && almatyHour < 20
-  const dayOfWeek = now.toLocaleString('en-US', { timeZone: 'Asia/Almaty', weekday: 'short' })
+  const isWorkingHours = minskHour >= 10 && minskHour < 20
+  const dayOfWeek = now.toLocaleString('en-US', { timeZone: 'Europe/Minsk', weekday: 'short' })
   const isWeekend = dayOfWeek === 'Sat' || dayOfWeek === 'Sun'
 
   return NextResponse.json({
     available: isWorkingHours && !isWeekend,
-    workingHours: '10:00-20:00 (Астана)',
-    currentTime: now.toLocaleString('ru-RU', { timeZone: 'Asia/Almaty' }),
+    workingHours: '10:00-20:00 (Минск)',
+    currentTime: now.toLocaleString('ru-RU', { timeZone: 'Europe/Minsk' }),
     message:
       isWorkingHours && !isWeekend
         ? 'Операторы онлайн, среднее время ответа 2-5 минут'

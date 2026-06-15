@@ -217,7 +217,7 @@ export function useChat(options: UseChatOptions) {
       // Update with fallback message
       setMessages(prev => prev.map(m => 
         m.id === connectingMessage.id 
-          ? { ...m, content: 'Оператор скоро ответит. Если долго нет ответа, напишите на info@netnext.org' }
+          ? { ...m, content: 'Оператор скоро ответит. Если долго нет ответа, напишите на hello@netnext.site' }
           : m
       ))
     }
