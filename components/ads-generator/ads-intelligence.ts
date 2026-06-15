@@ -430,7 +430,7 @@ export const ADS_NICHES: Record<string, AdsNiche> = {
     competition: "high",
     recommendations: [
       "Весна-лето — основной сезон ремонтов",
-      "Показывайте ��ортфолио и примеры работ",
+      "Показывайте ��ортфол��о и примеры работ",
       "Разделите кампании: квартиры, офисы, коттеджи"
     ],
     keywords: ["ремонт", "строительств", "отделк", "дизайн интерьер", "мастер", "бригада", "под ключ"]
@@ -1017,7 +1017,7 @@ export function formatNumber(num: number): string {
   return num.toString()
 }
 
-export function formatCurrency(num: number, currency: string = "Br"): string {
+export function formatCurrency(num: number, currency: string = "BYN"): string {
   if (num >= 1000000) {
     return (num / 1000000).toFixed(1) + "M " + currency
   }

@@ -170,7 +170,7 @@ const PlatformBadge = memo(function PlatformBadge({
         <span className="text-sm font-medium text-white">{name}</span>
       </div>
       <div className="flex items-center gap-3 text-xs text-[#666]">
-        <span>CPC: {cpc} Br</span>
+        <span>CPC: {cpc} BYN</span>
         <span>CTR: {ctr}%</span>
       </div>
     </button>
@@ -542,7 +542,7 @@ export function AdsWidget({ onContactClick }: AdsWidgetProps) {
           <div className="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-white/[0.04]">
             <div className="flex items-center gap-2 text-xs text-[#666]">
               <BarChart3 className="w-3.5 h-3.5" />
-              <span>10М+ Br под управлением</span>
+              <span>10М+ BYN под управлением</span>
             </div>
             <div 
               className="px-2 py-0.5 rounded-full text-xs font-medium"
