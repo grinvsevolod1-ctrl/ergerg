@@ -14,6 +14,15 @@ interface ContactLeadBody {
   description?: string
   source?: string
   consentGiven: boolean
+  utmSource?: string
+  utmMedium?: string
+  utmCampaign?: string
+  utmTerm?: string
+  utmContent?: string
+  yclid?: string
+  gclid?: string
+  referrer?: string
+  landingPage?: string
 }
 
 const budgetLabels: Record<string, string> = {
@@ -81,6 +90,15 @@ export async function POST(request: NextRequest) {
       description: fullDescription,
       deviceType,
       source: body.source || 'contact_form',
+      utmSource: body.utmSource ? sanitizeInput(body.utmSource) : undefined,
+      utmMedium: body.utmMedium ? sanitizeInput(body.utmMedium) : undefined,
+      utmCampaign: body.utmCampaign ? sanitizeInput(body.utmCampaign) : undefined,
+      utmTerm: body.utmTerm ? sanitizeInput(body.utmTerm) : undefined,
+      utmContent: body.utmContent ? sanitizeInput(body.utmContent) : undefined,
+      yclid: body.yclid ? sanitizeInput(body.yclid) : undefined,
+      gclid: body.gclid ? sanitizeInput(body.gclid) : undefined,
+      referrer: body.referrer ? sanitizeInput(body.referrer) : undefined,
+      landingPage: body.landingPage ? sanitizeInput(body.landingPage) : undefined,
       ipAddress: ip,
       userAgent,
       country: geo.country || undefined,

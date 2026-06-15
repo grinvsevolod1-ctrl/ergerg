@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
         ``,
         `*Сообщение:*`,
         esc(data.message || "\\-"),
+        attributionBlock(data),
         ``,
         `_${ts()}_`,
       ].filter(Boolean).join("\n")
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
         `*Контакт:* ${esc(data.contact)}`,
         data.type ? `*Тип:* ${projectTypeLabels[data.type] || data.type}` : null,
         data.message ? `*Сообщение:* ${esc(data.message)}` : null,
+        attributionBlock(data),
         ``,
         `_${ts()}_`,
       ].filter(Boolean).join("\n")
@@ -134,6 +136,26 @@ export async function POST(req: NextRequest) {
 
 function esc(text: string): string {
   return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&")
+}
+
+/**
+ * Builds a compact "откуда пришёл" block for the operator. Returns null when
+ * there is no attribution data so it gets filtered out of the message.
+ */
+function attributionBlock(data: Record<string, unknown>): string | null {
+  const src = typeof data.utmSource === "string" ? data.utmSource : ""
+  const campaign = typeof data.utmCampaign === "string" ? data.utmCampaign : ""
+  const term = typeof data.utmTerm === "string" ? data.utmTerm : ""
+  const yclid = typeof data.yclid === "string" ? data.yclid : ""
+
+  if (!src && !campaign && !term && !yclid) return null
+
+  const lines = [``, `*Источник:*`]
+  if (src) lines.push(`• utm\\_source: ${esc(src)}`)
+  if (campaign) lines.push(`• Кампания: ${esc(campaign)}`)
+  if (term) lines.push(`• Ключ: ${esc(term)}`)
+  if (yclid) lines.push(`• yclid: \`${esc(yclid)}\``)
+  return lines.join("\n")
 }
 
 function ts(): string {

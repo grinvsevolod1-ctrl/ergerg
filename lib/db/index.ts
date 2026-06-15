@@ -34,7 +34,7 @@ export async function execute(text: string, params?: unknown[]): Promise<number>
 }
 
 // Current schema version
-const SCHEMA_VERSION = 4
+const SCHEMA_VERSION = 5
 
 // Initialize database tables with versioning
 export async function initDatabase(): Promise<void> {
@@ -80,6 +80,12 @@ export async function initDatabase(): Promise<void> {
         utm_source VARCHAR(255),
         utm_medium VARCHAR(255),
         utm_campaign VARCHAR(255),
+        utm_term VARCHAR(255),
+        utm_content VARCHAR(255),
+        yclid VARCHAR(255),
+        gclid VARCHAR(255),
+        referrer TEXT,
+        landing_page TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW(),
         ip_address INET,
@@ -250,8 +256,18 @@ export async function initDatabase(): Promise<void> {
         updated_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- v5: marketing attribution columns for existing installs
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_term VARCHAR(255);
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_content VARCHAR(255);
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS yclid VARCHAR(255);
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS gclid VARCHAR(255);
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS referrer TEXT;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS landing_page TEXT;
+
       -- Indexes
       CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
+      CREATE INDEX IF NOT EXISTS idx_leads_yclid ON leads(yclid) WHERE yclid IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_leads_utm_campaign ON leads(utm_campaign) WHERE utm_campaign IS NOT NULL;
       CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
       CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
       CREATE INDEX IF NOT EXISTS idx_niche_cache_normalized ON niche_cache(normalized_niche);

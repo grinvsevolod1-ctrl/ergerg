@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { CreativeIcon } from "@/components/icons"
 import { reachGoal, YM_GOALS } from "@/lib/analytics"
+import { getAttribution } from "@/lib/attribution"
 
 /* ───────────────────────────────────────────────
    Floating CTA notification -- appears after user
@@ -87,7 +88,8 @@ export function FloatingCTA() {
       // Determine contact type
       const isEmail = formData.contact.includes("@") && !formData.contact.startsWith("@")
       const isTelegram = formData.contact.startsWith("@")
-      
+      const attribution = getAttribution()
+
       // Save lead to database
       await fetch("/api/leads/contact", {
         method: "POST",
@@ -102,6 +104,7 @@ export function FloatingCTA() {
           description: formData.message,
           source: "quick_form",
           consentGiven: true,
+          ...attribution,
         }),
       }).catch(() => {/* silent */})
 
@@ -111,7 +114,13 @@ export function FloatingCTA() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "quick_form",
-          data: formData,
+          data: {
+            ...formData,
+            utmSource: attribution.utmSource,
+            utmCampaign: attribution.utmCampaign,
+            utmTerm: attribution.utmTerm,
+            yclid: attribution.yclid,
+          },
         }),
       })
     } catch {

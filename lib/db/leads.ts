@@ -15,6 +15,12 @@ interface CreateLeadData {
   utmSource?: string
   utmMedium?: string
   utmCampaign?: string
+  utmTerm?: string
+  utmContent?: string
+  yclid?: string
+  gclid?: string
+  referrer?: string
+  landingPage?: string
   ipAddress?: string
   userAgent?: string
   country?: string
@@ -27,8 +33,9 @@ export async function createLead(data: CreateLeadData): Promise<Lead> {
       company_name, phone, email, description, niche,
       selected_variant_url, variants_viewed, time_spent_seconds,
       device_type, source, utm_source, utm_medium, utm_campaign,
+      utm_term, utm_content, yclid, gclid, referrer, landing_page,
       ip_address, user_agent, country, city
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::inet, $15, $16, $17)
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::inet, $21, $22, $23)
     RETURNING *`,
     [
       data.companyName,
@@ -44,6 +51,12 @@ export async function createLead(data: CreateLeadData): Promise<Lead> {
       data.utmSource || null,
       data.utmMedium || null,
       data.utmCampaign || null,
+      data.utmTerm || null,
+      data.utmContent || null,
+      data.yclid || null,
+      data.gclid || null,
+      data.referrer || null,
+      data.landingPage || null,
       data.ipAddress || null,
       data.userAgent || null,
       data.country || null,

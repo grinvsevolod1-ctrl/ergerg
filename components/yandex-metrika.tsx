@@ -3,6 +3,7 @@
 import { useEffect, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { METRIKA_ID } from '@/lib/analytics'
+import { captureAttribution } from '@/lib/attribution'
 
 declare global {
   interface Window {
@@ -33,6 +34,10 @@ function YandexMetrikaInner() {
       accurateTrackBounce: true,
       webvisor: true,
     })
+
+    // Capture UTM tags + ad click ids (yclid/gclid) from the landing URL so
+    // every later lead can be attributed to the exact ad campaign.
+    captureAttribution()
 
     return () => {
       const existingScript = document.querySelector(`script[src="${script.src}"]`)

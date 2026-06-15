@@ -28,6 +28,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SiriOrb } from "@/components/ai-orb"
+import { reachGoal, YM_GOALS } from "@/lib/analytics"
 
 type Role = "user" | "assistant" | "operator" | "system"
 type Status = "sending" | "sent" | "error"
@@ -87,6 +88,15 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const lastFailedRef = useRef<string | null>(null)
+  const openGoalFiredRef = useRef(false)
+
+  // Conversion goal: chat opened (fire once per page load).
+  useEffect(() => {
+    if (isOpen && !openGoalFiredRef.current) {
+      openGoalFiredRef.current = true
+      reachGoal(YM_GOALS.openChat)
+    }
+  }, [isOpen])
 
   // --- init session + history ---
   useEffect(() => {
@@ -277,6 +287,9 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
     setOperatorRequested(true)
     setError(null)
 
+    // Conversion goal: user asked for a live operator — strong lead intent.
+    reachGoal(YM_GOALS.chatLead, { via: "operator_request" })
+
     const sysId = genId()
     setMessages((prev) => [
       ...prev,
@@ -315,7 +328,7 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
             ? {
                 ...m,
                 content:
-                  "Не получилось уведомить оператора автоматически. Напишите нам на hello@netnext.site — ответим быстро.",
+                  "Не получилось уведомить оператора автоматиче��ки. Напишите нам на hello@netnext.site — ответим быстро.",
               }
             : m,
         ),

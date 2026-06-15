@@ -36,6 +36,10 @@ export const YM_GOALS = {
   clickCtaDiscuss: 'click_cta_discuss',
   /** Hero: клик по кнопке «Наши услуги» / портфолио */
   clickCtaPortfolio: 'click_cta_portfolio',
+  /** Открытие чата (первый разворот виджета) */
+  openChat: 'open_chat',
+  /** Заявка/контакт получены через чат (запрос оператора или оставлен контакт) */
+  chatLead: 'chat_lead',
 } as const
 
 export type YmGoal = (typeof YM_GOALS)[keyof typeof YM_GOALS]

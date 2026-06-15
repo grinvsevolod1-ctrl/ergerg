@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils"
 import { PhoneInput } from "@/components/phone-input"
 import { TelegramIcon, WhatsAppIcon, ViberIcon } from "@/components/icons"
 import { reachGoal, YM_GOALS, contactMethodGoal } from "@/lib/analytics"
+import { getAttribution } from "@/lib/attribution"
 
 /* ── Business description templates ── */
 const businessTemplates: Record<string, (business: string) => string> = {
@@ -78,7 +79,7 @@ const businessTemplates: Record<string, (business: string) => string> = {
   "страхование": (b) => `Сайт страхования "${b}".\n\nТребуется:\n- Виды страхования\n- Онлайн-калькулятор\n- Оформление полиса онлайн\n- Личный кабинет\n- Подача заявления о страховом случае`,
   
   // IT & Tech
-  "it-компания": (b) => `Сайт IT-компании "${b}".\n\nФункционал:\n- Портфолио проектов\n- Описание технологий и стека\n- Команда и экспертиза\n- Блог с т������ническими статьями\n- Форма заявки на проект\n- Интеграция с GitHub\n\nДизайн: современный, технологичный.`,
+  "it-компания": (b) => `Сайт IT-компании "${b}".\n\nФункционал:\n- Портфолио проектов\n- Описание технологий и стека\n- Команда и экспертиза\n- Блог с т��������ническими статьями\n- Форма заявки на проект\n- Интеграция с GitHub\n\nДизайн: современный, технологичный.`,
   "стартап": (b) => `Лендинг для стартапа "${b}".\n\nНужно:\n- Описание продукта\n- Преимущества и фичи\n- Демо/видео\n- Цены и тарифы\n- Форма регистрации\n- Инвесторам`,
   "saas": (b) => `Сайт SaaS-продукта "${b}".\n\nТребуется:\n- Описание возможностей\n- Тарифы и цены\n- Демо и free trial\n- Интеграции\n- База знаний\n- Личный кабинет`,
   
@@ -370,7 +371,8 @@ export function ContactSection() {
     setIsLoading(true)
     try {
       const contactValue = getContactValue()
-      
+      const attribution = getAttribution()
+
       const leadPayload = {
         companyName: formState.name,
         phone: contactMethod === "phone" ? contactValue : "",
@@ -383,6 +385,7 @@ export function ContactSection() {
         source: fromStartWidget ? "start_widget" : "contact_form",
         businessFromWidget: businessFromWidget || undefined,
         consentGiven: true,
+        ...attribution,
       }
 
       await fetch("/api/leads/contact", {
@@ -401,6 +404,10 @@ export function ContactSection() {
           budget: formState.budget,
           message: formState.message,
           source: fromStartWidget ? "start_widget" : "direct",
+          utmSource: attribution.utmSource,
+          utmCampaign: attribution.utmCampaign,
+          utmTerm: attribution.utmTerm,
+          yclid: attribution.yclid,
         },
       }
 

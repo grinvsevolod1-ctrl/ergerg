@@ -79,6 +79,28 @@ export function HeroSection({ onNavigate }: HeroSectionProps) {
 
           {/* Text content — z-20 keeps it ABOVE the enlarged video at all times */}
           <div className="order-2 lg:order-1 relative z-20 flex flex-col items-center text-center lg:items-start lg:text-left">
+            {/* Промо-бейдж акции — виден на первом экране, важно для рекламного трафика */}
+            <button
+              type="button"
+              onClick={() => {
+                reachGoal(YM_GOALS.clickCtaDiscuss, { source: "hero_promo_badge" })
+                onNavigate("landing")
+              }}
+              className="group/badge inline-flex items-center gap-2 self-center lg:self-start px-3.5 py-2 mb-5 rounded-full bg-primary/10 border border-primary/25 hover:border-primary/50 hover:bg-primary/15 transition-all"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+              </span>
+              <span className="text-xs sm:text-sm font-medium text-foreground/90">
+                Акция: лендинг за <span className="font-bold text-primary">600&nbsp;BYN</span>
+              </span>
+              <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-[#ff6b35]/15 text-[#ff6b35]">
+                −50%
+              </span>
+              <ArrowRight className="w-3.5 h-3.5 text-primary opacity-70 group-hover/badge:translate-x-0.5 transition-transform" />
+            </button>
+
             <h1 className="text-[2rem] leading-[1.15] sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-bold mb-5 sm:mb-6 text-balance tracking-tight">
               <span className="text-foreground">Мы создаём</span>
               <br />
