@@ -134,6 +134,24 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
     }
   }, [isOpen])
 
+  // --- lock page scroll (kills the second scrollbar) + close on Escape ---
+  useEffect(() => {
+    if (!isOpen) return
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onOpenChange(false)
+    }
+    window.addEventListener("keydown", onKeyDown)
+
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [isOpen, onOpenChange])
+
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, isTyping, isOpen])
@@ -370,6 +388,7 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
             className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm"
             onClick={() => onOpenChange(false)}
             aria-hidden="true"
@@ -380,13 +399,15 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
             role="dialog"
             aria-modal="true"
             aria-label="Чат с ассистентом NetNext"
-            initial={{ opacity: 0, scale: 0.96, y: 24 }}
+            initial={{ opacity: 0, scale: 0.9, y: 18 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 24 }}
-            transition={{ type: "spring", damping: 26, stiffness: 320 }}
+            exit={{ opacity: 0, scale: 0.94, y: 10 }}
+            transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+            style={{ transformOrigin: "top right", willChange: "transform, opacity" }}
             className={cn(
-              "fixed z-[101] inset-3 md:inset-auto",
-              "md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2",
+              // Centering via inset+margin (NOT translate) so framer-motion's
+              // transform animation doesn't fight the centering on desktop.
+              "fixed z-[101] inset-3 md:inset-0 md:m-auto",
               "md:w-[min(540px,92vw)] md:h-[min(680px,86vh)]",
               "flex flex-col overflow-hidden",
               "bg-card border border-border rounded-3xl",
@@ -487,7 +508,7 @@ export function NetNextChat({ isOpen, onOpenChange }: NetNextChatProps) {
             </AnimatePresence>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-3 md:px-4 py-4 space-y-3 [scrollbar-width:thin]">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 md:px-4 py-4 space-y-3 [scrollbar-width:thin]">
               {messages.map((msg) => {
                 if (msg.role === "system") {
                   return (

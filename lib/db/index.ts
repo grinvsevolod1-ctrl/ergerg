@@ -34,7 +34,7 @@ export async function execute(text: string, params?: unknown[]): Promise<number>
 }
 
 // Current schema version
-const SCHEMA_VERSION = 5
+const SCHEMA_VERSION = 6
 
 // Initialize database tables with versioning
 export async function initDatabase(): Promise<void> {
@@ -148,6 +148,7 @@ export async function initDatabase(): Promise<void> {
         operator_connected_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT NOW(),
         last_activity TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
         metadata JSONB DEFAULT '{}'
       );
 
@@ -256,6 +257,25 @@ export async function initDatabase(): Promise<void> {
         updated_at TIMESTAMP DEFAULT NOW()
       );
 
+      -- NetNext public chat learning logs (used by /api/chat/ai)
+      CREATE TABLE IF NOT EXISTS netnext_chat_logs (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        visitor_id VARCHAR(255),
+        user_message TEXT NOT NULL,
+        ai_response TEXT NOT NULL,
+        intent VARCHAR(100),
+        source VARCHAR(50),
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS netnext_chat_feedback (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        message_id VARCHAR(255) NOT NULL,
+        reaction VARCHAR(20) NOT NULL,
+        visitor_id VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+
       -- v5: marketing attribution columns for existing installs
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_term VARCHAR(255);
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS utm_content VARCHAR(255);
@@ -263,6 +283,12 @@ export async function initDatabase(): Promise<void> {
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS gclid VARCHAR(255);
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS referrer TEXT;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS landing_page TEXT;
+
+      -- v6: chat_sessions.updated_at — required by the update_chat_sessions_updated_at
+      -- trigger present in production dumps. Without it every UPDATE on chat_sessions
+      -- throws ("record \"new\" has no field \"updated_at\""), breaking message saving,
+      -- operator connect and AI suppression.
+      ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
 
       -- Indexes
       CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
