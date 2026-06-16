@@ -201,8 +201,10 @@ export async function POST(request: NextRequest) {
         timeMs: Date.now() - startTime
       })
 
-    } catch {
+    } catch (aiError) {
       // AI timeout or error - use fallback
+      const aiErrorMsg = aiError instanceof Error ? aiError.message : String(aiError)
+      console.error('[NetNext Chat] AI call failed, using fallback:', aiErrorMsg)
       const fallback = FALLBACK_RESPONSES[intent] || FALLBACK_RESPONSES.default
 
       // Save fallback interaction
@@ -236,6 +238,7 @@ export async function POST(request: NextRequest) {
         messageId,
         source: 'fallback',
         intent,
+        debugError: aiErrorMsg,
         timeMs: Date.now() - startTime
       })
     }
