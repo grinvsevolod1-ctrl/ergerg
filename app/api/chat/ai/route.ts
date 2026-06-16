@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimiters } from '@/lib/rate-limit'
-import { routedChat, AI_SERVERS } from '@/lib/ai/router'
+import { routedChat } from '@/lib/ai/router'
 import { query, execute } from '@/lib/db'
 
 export const runtime = 'nodejs'
@@ -238,7 +238,6 @@ export async function POST(request: NextRequest) {
         messageId,
         source: 'fallback',
         intent,
-        debugError: aiErrorMsg,
         timeMs: Date.now() - startTime
       })
     }
