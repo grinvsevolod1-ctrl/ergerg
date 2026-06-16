@@ -2,7 +2,9 @@
  * AI Router - Multi-server load balancing with health checks
  * 
  * Servers are configured via AI_SERVERS environment variable:
- * Format: name|url|model|timeout_ms|weight (comma-separated for multiple)
+ * Format: name|url|model|timeout_ms|weight|apiKey (comma-separated for multiple)
+ * apiKey is optional and only needed for cloud/proxied models that require auth.
+ * A global fallback key can also be set via OLLAMA_API_KEY.
  * Example: fast|http://localhost:11434|qwen2.5:3b|20000|1,quality|http://server2:11434|qwen2.5:7b|60000|2
  */
 
@@ -15,6 +17,13 @@ interface AIServerConfig {
   maxTokens: number
   timeout: number
   weight: number
+  apiKey?: string
+}
+
+// Build Authorization headers for a server (cloud models require a key)
+function authHeaders(config: AIServerConfig): Record<string, string> {
+  const key = config.apiKey || process.env.OLLAMA_API_KEY
+  return key ? { Authorization: `Bearer ${key}` } : {}
 }
 
 // Parse servers from environment variable
@@ -40,7 +49,7 @@ function parseServersFromEnv(): Record<string, AIServerConfig> {
   const serverEntries = envServers.split(',')
   
   for (const entry of serverEntries) {
-    const [name, url, model, timeoutStr, weightStr] = entry.split('|')
+    const [name, url, model, timeoutStr, weightStr, apiKeyStr] = entry.split('|')
     if (!name || !url || !model) continue
     
     const key = name.toLowerCase().replace(/\s+/g, '_')
@@ -52,6 +61,7 @@ function parseServersFromEnv(): Record<string, AIServerConfig> {
       maxTokens: 1024,
       timeout: parseInt(timeoutStr) || 20000,
       weight: parseInt(weightStr) || 1,
+      apiKey: apiKeyStr?.trim() || undefined,
     }
   }
   
@@ -125,6 +135,7 @@ export async function checkServerHealth(server: string): Promise<boolean> {
     const timeoutId = setTimeout(() => controller.abort(), 5000)
 
     const response = await fetch(`${config.url}/api/tags`, {
+      headers: { ...authHeaders(config) },
       signal: controller.signal,
     })
 
@@ -280,7 +291,7 @@ export async function routedChat(
 
     const response = await fetch(`${config.url}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders(config) },
       body: JSON.stringify({
         model: options?.model || config.defaultModel,
         messages: chatMessages,
