@@ -34,7 +34,7 @@ export async function execute(text: string, params?: unknown[]): Promise<number>
 }
 
 // Current schema version
-const SCHEMA_VERSION = 6
+const SCHEMA_VERSION = 7
 
 // Initialize database tables with versioning
 export async function initDatabase(): Promise<void> {
@@ -260,6 +260,7 @@ export async function initDatabase(): Promise<void> {
       -- NetNext public chat learning logs (used by /api/chat/ai)
       CREATE TABLE IF NOT EXISTS netnext_chat_logs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        message_id VARCHAR(255),
         visitor_id VARCHAR(255),
         user_message TEXT NOT NULL,
         ai_response TEXT NOT NULL,
@@ -267,6 +268,8 @@ export async function initDatabase(): Promise<void> {
         source VARCHAR(50),
         created_at TIMESTAMP DEFAULT NOW()
       );
+      -- for existing installs that created the table before message_id existed
+      ALTER TABLE netnext_chat_logs ADD COLUMN IF NOT EXISTS message_id VARCHAR(255);
 
       CREATE TABLE IF NOT EXISTS netnext_chat_feedback (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -290,6 +293,34 @@ export async function initDatabase(): Promise<void> {
       -- operator connect and AI suppression.
       ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
 
+      -- v7: auto-response rules + quick reply templates (admin /auto-responses page).
+      -- Without these tables the admin page and /api/chat/auto-response return 500.
+      CREATE TABLE IF NOT EXISTS auto_response_rules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        trigger_type VARCHAR(20) NOT NULL DEFAULT 'keywords',
+        trigger_keywords TEXT[],
+        trigger_pattern TEXT,
+        response_text TEXT NOT NULL,
+        response_buttons JSONB DEFAULT '[]'::jsonb,
+        priority INTEGER DEFAULT 0,
+        enabled BOOLEAN DEFAULT true,
+        use_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS quick_reply_templates (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        category VARCHAR(100) NOT NULL DEFAULT 'Общее',
+        title VARCHAR(255) NOT NULL,
+        content TEXT NOT NULL,
+        shortcut VARCHAR(50),
+        use_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
       -- Indexes
       CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
       CREATE INDEX IF NOT EXISTS idx_leads_yclid ON leads(yclid) WHERE yclid IS NOT NULL;
@@ -297,6 +328,10 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at);
       CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
       CREATE INDEX IF NOT EXISTS idx_niche_cache_normalized ON niche_cache(normalized_niche);
+      CREATE INDEX IF NOT EXISTS idx_auto_response_enabled ON auto_response_rules(enabled, priority DESC);
+      CREATE INDEX IF NOT EXISTS idx_chat_logs_message ON netnext_chat_logs(lower(user_message));
+      CREATE INDEX IF NOT EXISTS idx_chat_logs_created ON netnext_chat_logs(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_chat_feedback_msg ON netnext_chat_feedback(message_id);
       CREATE INDEX IF NOT EXISTS idx_analytics_session ON analytics_events(session_id);
       CREATE INDEX IF NOT EXISTS idx_preview_expires ON preview_shares(expires_at);
       CREATE INDEX IF NOT EXISTS idx_chat_sessions_active ON chat_sessions(operator_connected) WHERE operator_connected = true;

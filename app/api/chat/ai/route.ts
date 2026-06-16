@@ -11,6 +11,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { rateLimiters } from '@/lib/rate-limit'
 import { routedChat } from '@/lib/ai/router'
 import { query, execute } from '@/lib/db'
+import { findMatchingAutoResponse, incrementAutoResponseUse } from '@/lib/db/auto-responses'
+import {
+  hasForeignScript,
+  sanitizeResponse,
+  getLearningExamples,
+  getCachedLikedAnswer,
+} from '@/lib/ai/chat-intelligence'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -38,7 +45,7 @@ interface FeedbackBody {
 const NETNEXT_PERSONA = `Ты — Nexik, AI-ассистент белорусской веб-студии NetNext (netnext.site).
 
 ═══ ГЛАВНОЕ ПРАВИЛО — ЯЗЫК ═══
-Отвечай ТОЛЬКО на русском языке. Никогда не переключайся на английский, китайский или другие языки — даже если так проще. Это правило без исключений.
+Отвечай ТОЛЬКО на русском языке, используя исключительно кириллицу. Никогда не вставляй иероглифы, китайские, японские, корейские или арабские символы — ни одного знака. Не переключайся на английский или другие языки, даже если так кажется проще. Если засомневался в слове — подбери русский синоним. Это правило без исключений.
 
 ═══ КАК ТЫ ОБЩАЕШЬСЯ ═══
 - Дружелюбно, по-человечески, без канцелярита.
@@ -129,9 +136,38 @@ export async function POST(request: NextRequest) {
 
     const intent = detectIntent(message)
     const messageId = generateMessageId()
-    
+
+    // ── FAST PATH 1: previously liked answer for the exact same question ──
+    // The assistant gets faster over time: common repeated questions that
+    // already earned a 👍 are returned instantly without touching the LLM.
+    const cached = await getCachedLikedAnswer(message)
+    if (cached) {
+      saveInteraction(messageId, visitorId, message, cached, intent, 'cache').catch(() => {})
+      return respond(cached, messageId, 'cache', intent, startTime, stream)
+    }
+
+    // ── FAST PATH 2: admin-configured auto-response rule ──
+    // Rules from /admin/auto-responses (keywords / greeting / regex) are
+    // authoritative and answered instantly. The "fallback" rule is NOT used
+    // here — it is reserved for when the AI itself fails (see catch below).
+    const matchedRule = await findMatchingAutoResponse(message)
+    if (matchedRule && matchedRule.trigger_type !== 'fallback') {
+      incrementAutoResponseUse(matchedRule.id).catch(() => {})
+      saveInteraction(messageId, visitorId, message, matchedRule.response_text, intent, 'rule').catch(() => {})
+      return respond(matchedRule.response_text, messageId, 'rule', intent, startTime, stream, matchedRule.response_buttons)
+    }
+
+    // ── Learning: inject a few past liked answers as few-shot examples so the
+    // assistant reuses what worked (gets "smarter" over time). ──
+    const learningExamples = await getLearningExamples(3)
+    const fewShot = learningExamples.flatMap((ex) => [
+      { role: 'user' as const, content: ex.user },
+      { role: 'assistant' as const, content: ex.assistant },
+    ])
+
     // Build messages for AI
     const messages = [
+      ...fewShot,
       ...history.slice(-6).map(m => ({
         role: m.role as 'user' | 'assistant',
         content: m.content
@@ -141,105 +177,71 @@ export async function POST(request: NextRequest) {
 
     // Try AI with timeout
     try {
-      const aiResult = await Promise.race([
-        routedChat(
-          'simple',
-          messages,
-          {
-            // Do NOT hardcode the model here. Each server defines its own model
-            // via the AI_SERVERS env var; forcing a model name that isn't
-            // installed on the selected server makes Ollama return 404
-            // "model not found" and the chat falls back to a canned reply.
-            // Leaving model undefined lets routedChat use the selected
-            // server's own defaultModel.
+      // Low temperature keeps a small local model on-language (reduces the
+      // chance of foreign-script token leakage like "чем我可以 помочь").
+      const callModel = (temperature: number) =>
+        Promise.race([
+          routedChat('simple', messages, {
+            // Do NOT hardcode the model here — each server defines its own via
+            // AI_SERVERS; forcing a missing model causes Ollama 404.
             system: NETNEXT_PERSONA,
-            temperature: 0.7,
-            maxTokens: 250
-          }
-        ),
-        new Promise<never>((_, reject) => 
-          // Cloud / "pro" models can be slower on the first token, so allow
-          // more headroom before falling back to the canned reply.
-          setTimeout(() => reject(new Error('timeout')), 25000)
-        )
-      ])
+            temperature,
+            maxTokens: 250,
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 25000)
+          ),
+        ])
 
-      const responseText = aiResult.response
+      const aiResult = await callModel(0.4)
+      let responseText = aiResult.response
+
+      // ── Language guard: if the model leaked foreign script, retry once at a
+      // very low temperature; if it still leaks, strip the garbage. ──
+      if (hasForeignScript(responseText)) {
+        console.error('[NetNext Chat] Foreign script detected, retrying:', responseText.slice(0, 80))
+        try {
+          const retry = await callModel(0.1)
+          responseText = hasForeignScript(retry.response)
+            ? sanitizeResponse(retry.response)
+            : retry.response
+        } catch {
+          responseText = sanitizeResponse(responseText)
+        }
+        // If sanitizing left almost nothing usable, fall back cleanly.
+        if (responseText.replace(/[\s•\-—.,!?]/g, '').length < 5) {
+          throw new Error('response unusable after sanitize')
+        }
+      }
 
       // Save interaction for learning (async, don't wait)
-      saveInteraction(visitorId, message, responseText, intent, 'ai').catch(() => {})
+      saveInteraction(messageId, visitorId, message, responseText, intent, 'ai').catch(() => {})
 
-      // Streaming response
-      if (stream) {
-        const encoder = new TextEncoder()
-        const words = responseText.split(' ')
-        
-        const readable = new ReadableStream({
-          async start(controller) {
-            for (const word of words) {
-              controller.enqueue(encoder.encode(word + ' '))
-              await new Promise(r => setTimeout(r, 20 + Math.random() * 10))
-            }
-            controller.close()
-          }
-        })
-
-        return new Response(readable, {
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Transfer-Encoding': 'chunked',
-            'X-Message-Id': messageId
-          },
-        })
-      }
-
-      return NextResponse.json({
-        response: responseText,
-        messageId,
-        source: 'ai',
-        intent,
-        timeMs: Date.now() - startTime
-      })
+      return respond(responseText, messageId, 'ai', intent, startTime, stream)
 
     } catch (aiError) {
-      // AI timeout or error - use fallback
+      // AI timeout or error - use fallback.
       const aiErrorMsg = aiError instanceof Error ? aiError.message : String(aiError)
       console.error('[NetNext Chat] AI call failed, using fallback:', aiErrorMsg)
-      const fallback = FALLBACK_RESPONSES[intent] || FALLBACK_RESPONSES.default
 
-      // Save fallback interaction
-      saveInteraction(visitorId, message, fallback, intent, 'fallback').catch(() => {})
-
-      if (stream) {
-        const encoder = new TextEncoder()
-        const words = fallback.split(' ')
-        
-        const readable = new ReadableStream({
-          async start(controller) {
-            for (const word of words) {
-              controller.enqueue(encoder.encode(word + ' '))
-              await new Promise(r => setTimeout(r, 25 + Math.random() * 15))
-            }
-            controller.close()
-          }
-        })
-
-        return new Response(readable, {
-          headers: {
-            'Content-Type': 'text/plain; charset=utf-8',
-            'Transfer-Encoding': 'chunked',
-            'X-Message-Id': messageId
-          },
-        })
+      // Prefer an admin-configured "fallback" rule over the hardcoded one, so
+      // the fallback message is also editable from /admin/auto-responses.
+      let fallback = FALLBACK_RESPONSES[intent] || FALLBACK_RESPONSES.default
+      let fallbackButtons: { label: string; action: string }[] | undefined
+      try {
+        const fbRule = await findMatchingAutoResponse(message)
+        if (fbRule && fbRule.trigger_type === 'fallback') {
+          fallback = fbRule.response_text
+          fallbackButtons = fbRule.response_buttons
+        }
+      } catch {
+        // keep hardcoded fallback
       }
 
-      return NextResponse.json({
-        response: fallback,
-        messageId,
-        source: 'fallback',
-        intent,
-        timeMs: Date.now() - startTime
-      })
+      // Save fallback interaction
+      saveInteraction(messageId, visitorId, message, fallback, intent, 'fallback').catch(() => {})
+
+      return respond(fallback, messageId, 'fallback', intent, startTime, stream, fallbackButtons)
     }
 
   } catch (error) {
@@ -274,8 +276,52 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// Save interaction to database for learning
+// Unified response helper — streams or returns JSON, keeping the message id and
+// optional action buttons consistent across the AI / rule / cache / fallback paths.
+function respond(
+  text: string,
+  messageId: string,
+  source: 'ai' | 'rule' | 'cache' | 'fallback',
+  intent: string,
+  startTime: number,
+  stream: boolean,
+  buttons?: { label: string; action: string }[]
+): Response {
+  if (stream) {
+    const encoder = new TextEncoder()
+    const words = text.split(' ')
+    const readable = new ReadableStream({
+      async start(controller) {
+        for (const word of words) {
+          controller.enqueue(encoder.encode(word + ' '))
+          await new Promise(r => setTimeout(r, 20 + Math.random() * 10))
+        }
+        controller.close()
+      }
+    })
+    return new Response(readable, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Transfer-Encoding': 'chunked',
+        'X-Message-Id': messageId,
+      },
+    })
+  }
+
+  return NextResponse.json({
+    response: text,
+    messageId,
+    source,
+    intent,
+    ...(buttons && buttons.length > 0 ? { buttons } : {}),
+    timeMs: Date.now() - startTime,
+  })
+}
+
+// Save interaction to database for learning. message_id links the row to any
+// later 👍/👎 feedback so liked answers can be reused (see chat-intelligence).
 async function saveInteraction(
+  messageId: string,
   visitorId: string | undefined,
   userMessage: string,
   aiResponse: string,
@@ -284,9 +330,9 @@ async function saveInteraction(
 ) {
   try {
     await execute(
-      `INSERT INTO netnext_chat_logs (visitor_id, user_message, ai_response, intent, source, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())`,
-      [visitorId || 'anonymous', userMessage, aiResponse, intent, source]
+      `INSERT INTO netnext_chat_logs (message_id, visitor_id, user_message, ai_response, intent, source, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [messageId, visitorId || 'anonymous', userMessage, aiResponse, intent, source]
     )
   } catch (error) {
     console.error('[NetNext Chat] Failed to save interaction:', error)
