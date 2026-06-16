@@ -143,10 +143,14 @@ export async function POST(request: NextRequest) {
     try {
       const aiResult = await Promise.race([
         routedChat(
-          'simple', // FAST server for quick responses
+          'simple',
           messages,
           {
-            model: AI_SERVERS.fast.defaultModel, // Use defaultModel instead of complexModel
+            // Do NOT hardcode the model here. The load balancer (selectServer)
+            // may route to FAST (qwen2.5:3b) or QUALITY (llama3.2:3b). Forcing
+            // one model causes Ollama to return 404 "model not found" on the
+            // server that doesn't have it. Leaving model undefined lets
+            // routedChat use the selected server's own defaultModel.
             system: NETNEXT_PERSONA,
             temperature: 0.7,
             maxTokens: 250
