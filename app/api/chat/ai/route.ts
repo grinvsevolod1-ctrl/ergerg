@@ -146,18 +146,21 @@ export async function POST(request: NextRequest) {
           'simple',
           messages,
           {
-            // Do NOT hardcode the model here. The load balancer (selectServer)
-            // may route to FAST (qwen2.5:3b) or QUALITY (llama3.2:3b). Forcing
-            // one model causes Ollama to return 404 "model not found" on the
-            // server that doesn't have it. Leaving model undefined lets
-            // routedChat use the selected server's own defaultModel.
+            // Do NOT hardcode the model here. Each server defines its own model
+            // via the AI_SERVERS env var; forcing a model name that isn't
+            // installed on the selected server makes Ollama return 404
+            // "model not found" and the chat falls back to a canned reply.
+            // Leaving model undefined lets routedChat use the selected
+            // server's own defaultModel.
             system: NETNEXT_PERSONA,
             temperature: 0.7,
             maxTokens: 250
           }
         ),
         new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('timeout')), 12000)
+          // Cloud / "pro" models can be slower on the first token, so allow
+          // more headroom before falling back to the canned reply.
+          setTimeout(() => reject(new Error('timeout')), 25000)
         )
       ])
 
